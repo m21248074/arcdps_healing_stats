@@ -101,37 +101,37 @@ DetailsWindowState::DetailsWindowState(const AggregatedStatsEntry& pEntry)
 HealTableOptions::HealTableOptions()
 {
 	Windows[0].DataSourceChoice = DataSource::Totals;
-	snprintf(Windows[0].Name, sizeof(Windows[0].Name), "%s", "Totals");
-	snprintf(Windows[0].TitleFormat, sizeof(Windows[0].TitleFormat), "%s", "Totals ({1}s in combat)");
-	snprintf(Windows[0].EntryFormat, sizeof(Windows[0].EntryFormat), "%s", "{1} ({4}/s)");
+	snprintf(Windows[0].Name, sizeof(Windows[0].Name), "%s", u8"總計");
+	snprintf(Windows[0].TitleFormat, sizeof(Windows[0].TitleFormat), "%s", u8"總計 (進入戰鬥{1}秒)");
+	snprintf(Windows[0].EntryFormat, sizeof(Windows[0].EntryFormat), "%s", u8"{1} ({4}/秒)");
 
 	Windows[1].DataSourceChoice = DataSource::Agents;
-	snprintf(Windows[1].Name, sizeof(Windows[1].Name), "%s", "Targets");
-	snprintf(Windows[1].TitleFormat, sizeof(Windows[1].TitleFormat), "%s", "Targets {1} ({4}/s, {7}s in combat)");
+	snprintf(Windows[1].Name, sizeof(Windows[1].Name), "%s", u8"目標");
+	snprintf(Windows[1].TitleFormat, sizeof(Windows[1].TitleFormat), "%s", u8"目標 {1} ({4}/秒，進入戰鬥{7}秒)");
 
 	Windows[2].DataSourceChoice = DataSource::Skills;
-	snprintf(Windows[2].Name, sizeof(Windows[2].Name), "%s", "Skills");
-	snprintf(Windows[2].TitleFormat, sizeof(Windows[2].TitleFormat), "%s", "Skills {1} ({4}/s, {7}s in combat)");
+	snprintf(Windows[2].Name, sizeof(Windows[2].Name), "%s", u8"技能");
+	snprintf(Windows[2].TitleFormat, sizeof(Windows[2].TitleFormat), "%s", u8"技能 {1} ({4}/秒，進入戰鬥{7}秒)");
 
 	Windows[3].DataSourceChoice = DataSource::Agents;
-	snprintf(Windows[3].Name, sizeof(Windows[3].Name), "%s", "Targets (hits)");
-	snprintf(Windows[3].TitleFormat, sizeof(Windows[3].TitleFormat), "%s", "Targets {1} ({5}/hit, {2} hits)");
-	snprintf(Windows[3].EntryFormat, sizeof(Windows[3].EntryFormat), "%s", "{1} ({5}/hit, {2} hits)");
-	snprintf(Windows[3].DetailsEntryFormat, sizeof(Windows[3].DetailsEntryFormat), "%s", "{1} ({5}/hit, {2} hits)");
+	snprintf(Windows[3].Name, sizeof(Windows[3].Name), "%s", u8"目標 (命中數)");
+	snprintf(Windows[3].TitleFormat, sizeof(Windows[3].TitleFormat), "%s", u8"目標 {1} ({5}/每命中, {2} 次命中)");
+	snprintf(Windows[3].EntryFormat, sizeof(Windows[3].EntryFormat), "%s", u8"{1} ({5}/每命中, {2} 次命中)");
+	snprintf(Windows[3].DetailsEntryFormat, sizeof(Windows[3].DetailsEntryFormat), "%s", u8"{1} ({5}/每命中, {2} 次命中)");
 
 	Windows[4].DataSourceChoice = DataSource::Skills;
-	snprintf(Windows[4].Name, sizeof(Windows[4].Name), "%s", "Skills (hits)");
-	snprintf(Windows[4].TitleFormat, sizeof(Windows[4].TitleFormat), "%s", "Skills {1} ({5}/hit, {2} hits)");
-	snprintf(Windows[4].EntryFormat, sizeof(Windows[4].EntryFormat), "%s", "{1} ({5}/hit, {2} hits)");
-	snprintf(Windows[4].DetailsEntryFormat, sizeof(Windows[4].DetailsEntryFormat), "%s", "{1} ({5}/hit, {2} hits)");
+	snprintf(Windows[4].Name, sizeof(Windows[4].Name), "%s", u8"技能 (命中數)");
+	snprintf(Windows[4].TitleFormat, sizeof(Windows[4].TitleFormat), "%s", u8"技能 {1} ({5}/每命中, {2} 次命中)");
+	snprintf(Windows[4].EntryFormat, sizeof(Windows[4].EntryFormat), "%s", u8"{1} ({5}/每命中, {2} 次命中)");
+	snprintf(Windows[4].DetailsEntryFormat, sizeof(Windows[4].DetailsEntryFormat), u8"%s", "{1} ({5}/每命中, {2} 次命中)");
 
 	Windows[5].DataSourceChoice = DataSource::PeersOutgoing;
-	snprintf(Windows[5].Name, sizeof(Windows[5].Name), "%s", "Peers outgoing");
-	snprintf(Windows[5].TitleFormat, sizeof(Windows[5].TitleFormat), "%s", "Outgoing healing {1} ({4}/s, {7}s in combat)");
+	snprintf(Windows[5].Name, sizeof(Windows[5].Name), "%s", u8"隊員輸出治療");
+	snprintf(Windows[5].TitleFormat, sizeof(Windows[5].TitleFormat), "%s", u8"輸出治療 {1} ({4}/秒，進入戰鬥{7}秒)");
 
 	Windows[9].DataSourceChoice = DataSource::Combined;
-	snprintf(Windows[9].Name, sizeof(Windows[9].Name), "%s", "Combined");
-	snprintf(Windows[9].TitleFormat, sizeof(Windows[9].TitleFormat), "%s", "Combined {1} ({4}/s, {7}s in combat)");
+	snprintf(Windows[9].Name, sizeof(Windows[9].Name), "%s", u8"綜合");
+	snprintf(Windows[9].TitleFormat, sizeof(Windows[9].TitleFormat), "%s", u8"綜合 {1} ({4}/秒，進入戰鬥{7}秒)");
 }
 
 void HealTableOptions::Load(const char* pConfigPath)

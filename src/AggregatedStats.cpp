@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <map>
 
-constexpr const char* GROUP_FILTER_STRING[] = { "Group", "Squad", "All (Excluding Summons)", "All (Including Summons)" };
+constexpr const char* GROUP_FILTER_STRING[] = { u8"小隊", u8"團隊", u8"所有 (排除召喚物)", u8"所有 (包括召喚物)" };
 static_assert((sizeof(GROUP_FILTER_STRING) / sizeof(GROUP_FILTER_STRING[0])) == static_cast<size_t>(GroupFilter::Max), "Added group filter option without updating gui?");
 
 AggregatedStatsEntry::AggregatedStatsEntry(uint64_t pId, std::string&& pName, float pTimeInCombat, uint64_t pHealing, uint64_t pHits, std::optional<uint64_t> pCasts)
@@ -464,7 +464,7 @@ const AggregatedVector& AggregatedStats::GetSkills(std::optional<uintptr_t> pAge
 
 	if (totalIndirectHealing != 0 || totalIndirectTicks != 0)
 	{
-		std::string skillName("Healing by Damage Dealt");
+		std::string skillName(u8"透過造成傷害進行治療(傷害轉換成治療)");
 
 		entry->Add(IndirectHealingSkillId, std::move(skillName), GetCombatTime(), totalIndirectHealing, totalIndirectTicks, std::nullopt);
 	}

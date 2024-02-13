@@ -11,21 +11,21 @@
 #include <Windows.h>
 
 static constexpr EnumStringArray<AutoUpdateSettingEnum> AUTO_UPDATE_SETTING_ITEMS{
-	"off", "on (only download stable)", "on (download prerelease/stable)"
+	u8"關閉", u8"開啟 (僅下載穩定版本)", u8"開啟 (下載先行/穩定版本)"
 };
 static constexpr EnumStringArray<DataSource> DATA_SOURCE_ITEMS{
-	"targets", "skills", "totals", "combined", "peers outgoing"};
+	u8"目標", u8"技能", u8"總計", u8"綜合", u8"團員輸出治療"};
 static constexpr EnumStringArray<SortOrder> SORT_ORDER_ITEMS{
-	"alphabetical ascending", "alphabetical descending", "heal per second ascending", "heal per second descending"};
+	u8"按字母由A到Z(升序)", u8"按字母由Z到A(降序)", u8"按每秒治療量由小到大(升序)", u8"按每秒治療量由大到小(降序)"};
 static constexpr EnumStringArray<CombatEndCondition> COMBAT_END_CONDITION_ITEMS{
-	"combat exit", "last damage event", "last heal event", "last damage / heal event"};
+	u8"離開戰鬥", u8"最後傷害事件", u8"最後治療事件", u8"最後傷害/治療事件"};
 static constexpr EnumStringArray<spdlog::level::level_enum, 7> LOG_LEVEL_ITEMS{
-	"trace", "debug", "info", "warning", "error", "critical", "off"};
+	u8"追蹤", u8"除錯", u8"資訊", u8"警告", u8"錯誤", u8"致命", u8"關閉"};
 
 static constexpr EnumStringArray<Position, static_cast<size_t>(Position::WindowRelative) + 1> POSITION_ITEMS{
-	"manual", "screen relative", "window relative"};
+	u8"手動", u8"螢幕相對位置", u8"視窗相對位置"};
 static constexpr EnumStringArray<CornerPosition, static_cast<size_t>(CornerPosition::BottomRight) + 1> CORNER_POSITION_ITEMS{
-	"top-left", "top-right", "botttom-left", "bottom-right"};
+	u8"左上", u8"右上", u8"左下", u8"右下"};
 
 static void Display_DetailsWindow(HealWindowContext& pContext, DetailsWindowState& pState, DataSource pDataSource)
 {
@@ -43,15 +43,15 @@ static void Display_DetailsWindow(HealWindowContext& pContext, DetailsWindowStat
 
 	if (ImGui::BeginPopupContextWindow("Options##HEAL") == true)
 	{
-		ImGui::InputText("entry format", pContext.DetailsEntryFormat, sizeof(pContext.DetailsEntryFormat));
-		ImGuiEx::AddTooltipToLastItem("Format for displayed data (statistics are per entry).\n"
-		                              "{1}: Healing\n"
-		                              "{2}: Hits\n"
-		                              "{3}: Casts (not implemented yet)\n"
-		                              "{4}: Healing per second\n"
-		                              "{5}: Healing per hit\n"
-		                              "{6}: Healing per cast (not implemented yet)\n"
-		                              "{7}: Percent of total healing\n");
+		ImGui::InputText(u8"條目格式", pContext.DetailsEntryFormat, sizeof(pContext.DetailsEntryFormat));
+		ImGuiEx::AddTooltipToLastItem(u8"顯示資料的格式(統計資料為每個條目)。\n"
+		                              u8"{1}: 治療量\n"
+		                              u8"{2}: 命中數\n"
+		                              u8"{3}: 施法數 (尚未實作)\n"
+		                              u8"{4}: 每秒治療量\n"
+		                              u8"{5}: 每次命中治療量\n"
+		                              u8"{6}: 每次施法治療量 (尚未實作)\n"
+		                              u8"{7}: 佔總治療量百分比\n");
 
 		ImGui::EndPopup();
 	}
@@ -61,31 +61,31 @@ static void Display_DetailsWindow(HealWindowContext& pContext, DetailsWindowStat
 	ImGui::PushStyleColor(ImGuiCol_ChildBg, bgColor);
 	snprintf(buffer, sizeof(buffer), "##HEALDETAILS.TOTALS.%i.%llu", static_cast<int>(pDataSource), pState.Id);
 	ImGui::BeginChild(buffer, ImVec2(ImGui::GetWindowContentRegionWidth() * 0.35f, 0));
-	ImGui::Text("total healing");
+	ImGui::Text(u8"總治療量");
 	ImGuiEx::TextRightAlignedSameLine("%llu", pState.Healing);
 
-	ImGui::Text("hits");
+	ImGui::Text(u8"命中數");
 	ImGuiEx::TextRightAlignedSameLine("%llu", pState.Hits);
 
 	if (pState.Casts.has_value() == true)
 	{
-		ImGui::Text("casts");
+		ImGui::Text(u8"施法數");
 		ImGuiEx::TextRightAlignedSameLine("%llu", *pState.Casts);
 	}
 
-	ImGui::Text("healing per second");
+	ImGui::Text(u8"每秒治療量");
 	ImGuiEx::TextRightAlignedSameLine("%.1f", divide_safe(pState.Healing, pState.TimeInCombat));
 
-	ImGui::Text("healing per hit");
+	ImGui::Text(u8"每次命中治療量");
 	ImGuiEx::TextRightAlignedSameLine("%.1f", divide_safe(pState.Healing, pState.Hits));
 
 	if (pState.Casts.has_value() == true)
 	{
-		ImGui::Text("healing per cast");
+		ImGui::Text(u8"每次施法治療量");
 		ImGuiEx::TextRightAlignedSameLine("%.1f", divide_safe(pState.Healing, *pState.Casts));
 	}
 
-	ImGuiEx::BottomText("id %u", pState.Id);
+	ImGuiEx::BottomText("ID %u", pState.Id);
 	ImGui::EndChild();
 
 	snprintf(buffer, sizeof(buffer), "##HEALDETAILS.ENTRIES.%i.%llu", static_cast<int>(pDataSource), pState.Id);
@@ -128,7 +128,7 @@ static void Display_Content(HealWindowContext& pContext, DataSource pDataSource,
 	{
 		if (pEvtcRpcEnabled == false)
 		{
-			ImGui::TextWrapped("Live stats sharing is disabled. Enable \"live stats sharing\" under \"Heal Stats Options\" in order to see the healing done by other players in the squad.");
+			ImGui::TextWrapped(u8"即時統計資料共享已停用。 啟用\"治療統計選項\"內的\"即時統計資料共享\"，以便查看團隊中其他玩家的治療狀況。");
 			pContext.CurrentFrameLineCount += 3;
 			return;
 		}
@@ -136,7 +136,7 @@ static void Display_Content(HealWindowContext& pContext, DataSource pDataSource,
 		evtc_rpc_client_status status = GlobalObjects::EVTC_RPC_CLIENT->GetStatus();
 		if (status.Connected == false)
 		{
-			ImGui::TextWrapped("Not connected to the live stats sharing server (\"%s\").", status.Endpoint.c_str());
+			ImGui::TextWrapped(u8"未連接到即時統計共享伺服器 (\"%s\")。", status.Endpoint.c_str());
 			pContext.CurrentFrameLineCount += 3;
 			return;
 		}
@@ -227,7 +227,7 @@ static void Display_WindowOptions_Position(HealTableOptions& pHealingOptions, He
 		case Position::ScreenRelative:
 		{
 			ImGui::Separator();
-			ImGui::TextUnformatted("relative to corner");
+			ImGui::TextUnformatted(u8"相對於螢幕角落");
 			ImGuiEx::SmallIndent();
 			ImGuiEx::SmallEnumRadioButton("ScreenCornerPositionEnum", pContext.RelativeScreenCorner, CORNER_POSITION_ITEMS);
 			ImGuiEx::SmallUnindent();
@@ -242,12 +242,12 @@ static void Display_WindowOptions_Position(HealTableOptions& pHealingOptions, He
 		case Position::WindowRelative:
 		{
 			ImGui::Separator();
-			ImGui::TextUnformatted("from anchor panel corner");
+			ImGui::TextUnformatted(u8"從錨點面板角落");
 			ImGuiEx::SmallIndent();
 			ImGuiEx::SmallEnumRadioButton("AnchorCornerPositionEnum", pContext.RelativeAnchorWindowCorner, CORNER_POSITION_ITEMS);
 			ImGuiEx::SmallUnindent();
 
-			ImGui::TextUnformatted("to this panel corner");
+			ImGui::TextUnformatted(u8"到此面板角落");
 			ImGuiEx::SmallIndent();
 			ImGuiEx::SmallEnumRadioButton("SelfCornerPositionEnum", pContext.RelativeSelfCorner, CORNER_POSITION_ITEMS);
 			ImGuiEx::SmallUnindent();
@@ -265,7 +265,7 @@ static void Display_WindowOptions_Position(HealTableOptions& pHealingOptions, He
 			}
 
 			ImGui::SetNextItemWidth(260.0f);
-			if (ImGui::BeginCombo("anchor window", selectedWindowName) == true)
+			if (ImGui::BeginCombo(u8"錨點視窗", selectedWindowName) == true)
 			{
 				// This doesn't return the same thing as RootWindow interestingly enough, RootWindow returns a "higher" parent
 				ImGuiWindow* parent = ImGui::GetCurrentWindowRead();
@@ -315,113 +315,112 @@ static void Display_WindowOptions(HealTableOptions& pHealingOptions, HealWindowC
 	if (ImGui::BeginPopupContextWindow("Options##HEAL") == true)
 	{
 		ImGuiEx::SmallIndent();
-		ImGuiEx::ComboMenu("data source", pContext.DataSourceChoice, DATA_SOURCE_ITEMS);
-		ImGuiEx::AddTooltipToLastItem("Decides what data is shown in the window");
+		ImGuiEx::ComboMenu(u8"資料來源", pContext.DataSourceChoice, DATA_SOURCE_ITEMS);
+		ImGuiEx::AddTooltipToLastItem(u8"決定視窗中顯示哪些資料");
 
 		if (pContext.DataSourceChoice != DataSource::Totals)
 		{
-			ImGuiEx::ComboMenu("sort order", pContext.SortOrderChoice, SORT_ORDER_ITEMS);
-			ImGuiEx::AddTooltipToLastItem("Decides how targets and skills are sorted in the 'Targets' and 'Skills' sections.");
+			ImGuiEx::ComboMenu(u8"排序", pContext.SortOrderChoice, SORT_ORDER_ITEMS);
+			ImGuiEx::AddTooltipToLastItem(u8"決定如何在\"目標\"和\"技能\"部分中對目標和技能進行排序。");
 
-			if (ImGui::BeginMenu("stats exclude") == true)
+			if (ImGui::BeginMenu(u8"統計資料排除") == true)
 			{
-				ImGuiEx::SmallCheckBox("group", &pContext.ExcludeGroup);
-				ImGuiEx::SmallCheckBox("off-group", &pContext.ExcludeOffGroup);
-				ImGuiEx::SmallCheckBox("off-squad", &pContext.ExcludeOffSquad);
-				ImGuiEx::SmallCheckBox("summons", &pContext.ExcludeMinions);
-				ImGuiEx::SmallCheckBox("unmapped", &pContext.ExcludeUnmapped);
+				ImGuiEx::SmallCheckBox(u8"小隊", &pContext.ExcludeGroup);
+				ImGuiEx::SmallCheckBox(u8"小隊外", &pContext.ExcludeOffGroup);
+				ImGuiEx::SmallCheckBox(u8"團隊外", &pContext.ExcludeOffSquad);
+				ImGuiEx::SmallCheckBox(u8"召喚物", &pContext.ExcludeMinions);
+				ImGuiEx::SmallCheckBox(u8"其他", &pContext.ExcludeUnmapped);
 
 				ImGui::EndMenu();
 			}
 		}
 
-		ImGuiEx::ComboMenu("combat end", pContext.CombatEndConditionChoice, COMBAT_END_CONDITION_ITEMS);
-		ImGuiEx::AddTooltipToLastItem("Decides what should be used for determining combat\n"
-										"end (and consequently time in combat)");
+		ImGuiEx::ComboMenu(u8"戰鬥結束", pContext.CombatEndConditionChoice, COMBAT_END_CONDITION_ITEMS);
+		ImGuiEx::AddTooltipToLastItem(u8"決定應該使用標準來確定戰鬥結束\n"
+										u8"(以及戰鬥中的時間)");
 
 		ImGuiEx::SmallUnindent();
 		ImGui::Separator();
 
-		if (ImGui::BeginMenu("Display") == true)
+		if (ImGui::BeginMenu(u8"顯示") == true)
 		{
-			ImGuiEx::SmallCheckBox("draw bars", &pContext.ShowProgressBars);
-			ImGuiEx::AddTooltipToLastItem("Show a colored bar under each entry signifying what the value of\n"
-				"that entry is in proportion to the largest entry");
+			ImGuiEx::SmallCheckBox(u8"顯示條形圖", &pContext.ShowProgressBars);
+			ImGuiEx::AddTooltipToLastItem(u8"在每個條目下方顯示一個有色條，表示該條目與最大條目的比例");
 
 			ImGui::SetNextItemWidth(260.0f);
-			ImGuiEx::SmallInputText("short name", pContext.Name, sizeof(pContext.Name));
-			ImGuiEx::AddTooltipToLastItem("The name used to represent this window in the \"heal stats\" menu");
+			ImGuiEx::SmallInputText(u8"簡稱", pContext.Name, sizeof(pContext.Name));
+			ImGuiEx::AddTooltipToLastItem(u8"用於在\"治療統計\"選單中表示此視窗的名稱");
 
 			ImGui::SetNextItemWidth(39.0f);
-			ImGuiEx::SmallInputInt("max name length", &pContext.MaxNameLength);
+			ImGuiEx::SmallInputInt(u8"最大名字長度", &pContext.MaxNameLength);
 			ImGuiEx::AddTooltipToLastItem(
-				"Truncate displayed names to this many characters. Set to 0 to disable.");
+				u8"將顯示的名稱截斷為所設定長度的字串。 設定為 0 以停用。");
 
 			ImGui::SetNextItemWidth(39.0f);
-			ImGuiEx::SmallInputInt("min displayed", &pContext.MinLinesDisplayed);
+			ImGuiEx::SmallInputInt(u8"最小顯示行數", &pContext.MinLinesDisplayed);
 			ImGuiEx::AddTooltipToLastItem(
-				"The minimum amount of lines of data to show in this window.");
+				u8"此視窗中顯示的最小資料行數。");
 
 			ImGui::SetNextItemWidth(39.0f);
-			ImGuiEx::SmallInputInt("max displayed", &pContext.MaxLinesDisplayed);
+			ImGuiEx::SmallInputInt(u8"最大顯示行數", &pContext.MaxLinesDisplayed);
 			ImGuiEx::AddTooltipToLastItem(
-				"The maximum amount of lines of data to show in this window. Set to 0 for no limit");
+				u8"此視窗中顯示的最大資料行數。 設定為 0 表示無限制");
 
 			ImGui::SetNextItemWidth(260.0f);
-			ImGuiEx::SmallInputText("stats format", pContext.EntryFormat, sizeof(pContext.EntryFormat));
+			ImGuiEx::SmallInputText(u8"統計資料格式", pContext.EntryFormat, sizeof(pContext.EntryFormat));
 			if (pContext.DataSourceChoice != DataSource::Totals)
 			{
-				ImGuiEx::AddTooltipToLastItem("Format for displayed data (statistics are per entry).\n"
-					"{1}: Healing\n"
-					"{2}: Hits\n"
-					"{3}: Casts (not implemented yet)\n"
-					"{4}: Healing per second\n"
-					"{5}: Healing per hit\n"
-					"{6}: Healing per cast (not implemented yet)\n"
-					"{7}: Percent of total healing");
+				ImGuiEx::AddTooltipToLastItem(u8"顯示資料的格式(統計資料為每個條目)。\n"
+					u8"{1}: 治療量\n"
+					u8"{2}: 命中數\n"
+					u8"{3}: 施法數 (尚未實作)\n"
+					u8"{4}: 每秒治療量\n"
+					u8"{5}: 每次命中治療量\n"
+					u8"{6}: 每次施法治療量 (尚未實作)\n"
+					u8"{7}: 佔總治療量百分比");
 			}
 			else
 			{
-				ImGuiEx::AddTooltipToLastItem("Format for displayed data (statistics are per entry).\n"
-					"{1}: Healing\n"
-					"{2}: Hits\n"
-					"{3}: Casts (not implemented yet)\n"
-					"{4}: Healing per second\n"
-					"{5}: Healing per hit\n"
-					"{6}: Healing per cast (not implemented yet)");
+				ImGuiEx::AddTooltipToLastItem(u8"顯示資料的格式(統計資料為每個條目)。\n"
+					u8"{1}: 治療量\n"
+					u8"{2}: 命中數\n"
+					u8"{3}: 施法數 (尚未實作)\n"
+					u8"{4}: 每秒治療量\n"
+					u8"{5}: 每次命中治療量\n"
+					u8"{6}: 每次施法治療量 (尚未實作)");
 			}
 
 			ImGui::SetNextItemWidth(260.0f);
-			ImGuiEx::SmallInputText("title bar format", pContext.TitleFormat, sizeof(pContext.TitleFormat));
+			ImGuiEx::SmallInputText(u8"標題欄格式", pContext.TitleFormat, sizeof(pContext.TitleFormat));
 			if (pContext.DataSourceChoice != DataSource::Totals)
 			{
-				ImGuiEx::AddTooltipToLastItem("Format for the title of this window.\n"
-					"{1}: Total healing\n"
-					"{2}: Total hits\n"
-					"{3}: Total casts (not implemented yet)\n"
-					"{4}: Healing per second\n"
-					"{5}: Healing per hit\n"
-					"{6}: Healing per cast (not implemented yet)\n"
-					"{7}: Time in combat");
+				ImGuiEx::AddTooltipToLastItem(u8"此視窗標題的格式。\n"
+					u8"{1}: 總治療量\n"
+					u8"{2}: 總命中數\n"
+					u8"{3}: 總施法數 (尚未實作)\n"
+					u8"{4}: 每秒治療量\n"
+					u8"{5}: 每次命中治療量\n"
+					u8"{6}: 每次施法治療量 (尚未實作)\n"
+					u8"{7}: 戰鬥時間");
 			}
 			else
 			{
-				ImGuiEx::AddTooltipToLastItem("Format for the title of this window.\n"
-					"{1}: Time in combat");
+				ImGuiEx::AddTooltipToLastItem(u8"此視窗標題的格式。\n"
+					u8"{1}: 戰鬥時間");
 			}
 
 			ImGui::EndMenu();
 		}
 
-		if (ImGui::BeginMenu("Style") == true)
+		if (ImGui::BeginMenu(u8"樣式") == true)
 		{
-			ImGuiEx::SmallEnumCheckBox("title bar", &pContext.WindowFlags, ImGuiWindowFlags_NoTitleBar, true);
-			ImGuiEx::SmallEnumCheckBox("scroll bar", &pContext.WindowFlags, ImGuiWindowFlags_NoScrollbar, true);
-			ImGuiEx::SmallEnumCheckBox("background", &pContext.WindowFlags, ImGuiWindowFlags_NoBackground, true);
+			ImGuiEx::SmallEnumCheckBox(u8"標題欄", &pContext.WindowFlags, ImGuiWindowFlags_NoTitleBar, true);
+			ImGuiEx::SmallEnumCheckBox(u8"滾動條", &pContext.WindowFlags, ImGuiWindowFlags_NoScrollbar, true);
+			ImGuiEx::SmallEnumCheckBox(u8"背景", &pContext.WindowFlags, ImGuiWindowFlags_NoBackground, true);
 			
 			ImGui::Separator();
 
-			ImGuiEx::SmallCheckBox("auto resize window", &pContext.AutoResize);
+			ImGuiEx::SmallCheckBox(u8"自動調整視窗大小", &pContext.AutoResize);
 			if (pContext.AutoResize == false)
 			{
 				ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
@@ -430,9 +429,9 @@ static void Display_WindowOptions(HealTableOptions& pHealingOptions, HealWindowC
 			ImGuiEx::SmallIndent();
 
 			ImGui::SetNextItemWidth(65.0f);
-			ImGuiEx::SmallInputInt("window width", &pContext.FixedWindowWidth);
+			ImGuiEx::SmallInputInt(u8"視窗寬度", &pContext.FixedWindowWidth);
 			ImGuiEx::AddTooltipToLastItem(
-				"Set to 0 for dynamic resizing of width");
+				u8"設定為 0 以動態調整寬度大小");
 
 			ImGuiEx::SmallUnindent();
 			if (pContext.AutoResize == false)
@@ -444,7 +443,7 @@ static void Display_WindowOptions(HealTableOptions& pHealingOptions, HealWindowC
 			ImGui::EndMenu();
 		}
 
-		if (ImGui::BeginMenu("Position") == true)
+		if (ImGui::BeginMenu(u8"位置座標") == true)
 		{
 			Display_WindowOptions_Position(pHealingOptions, pContext);
 			ImGui::EndMenu();
@@ -456,7 +455,7 @@ static void Display_WindowOptions(HealTableOptions& pHealingOptions, HealWindowC
 		ImGui::BeginGroup();
 
 		ImGui::SetCursorPosY(oldPosY + ImGui::GetStyle().FramePadding.y);
-		ImGui::Text("Hotkey");
+		ImGui::Text(u8"熱鍵");
 
 		ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
 		ImGui::SetCursorPosY(oldPosY);
@@ -468,8 +467,8 @@ static void Display_WindowOptions(HealTableOptions& pHealingOptions, HealWindowC
 		ImGui::Text("(%s)", VirtualKeyToString(pContext.Hotkey).c_str());
 
 		ImGui::EndGroup();
-		ImGuiEx::AddTooltipToLastItem("Numerical value (virtual key code) for the key\n"
-										"used to open and close this window");
+		ImGuiEx::AddTooltipToLastItem(u8"用於開啟和關閉此視窗按鍵的數值\n"
+										u8"(虛擬按鍵代碼)");
 
 		ImGui::EndPopup();
 	}
@@ -577,17 +576,17 @@ void Display_GUI(HealTableOptions& pHealingOptions)
 			curWindow.CurrentFrameLineCount += 3; // For the 3 headers
 
 			ImGui::PushID(static_cast<int>(DataSource::Totals));
-			ImGuiEx::TextColoredCentered(ImColor(0, 209, 165), "Totals");
+			ImGuiEx::TextColoredCentered(ImColor(0, 209, 165), u8"總計");
 			Display_Content(curWindow, DataSource::Totals, i, pHealingOptions.EvtcRpcEnabled);
 			ImGui::PopID();
 
 			ImGui::PushID(static_cast<int>(DataSource::Agents));
-			ImGuiEx::TextColoredCentered(ImColor(0, 209, 165), "Targets");
+			ImGuiEx::TextColoredCentered(ImColor(0, 209, 165), u8"目標");
 			Display_Content(curWindow, DataSource::Agents, i, pHealingOptions.EvtcRpcEnabled);
 			ImGui::PopID();
 
 			ImGui::PushID(static_cast<int>(DataSource::Skills));
-			ImGuiEx::TextColoredCentered(ImColor(0, 209, 165), "Skills");
+			ImGuiEx::TextColoredCentered(ImColor(0, 209, 165), u8"技能");
 			Display_Content(curWindow, DataSource::Skills, i, pHealingOptions.EvtcRpcEnabled);
 			ImGui::PopID();
 		}
@@ -651,21 +650,21 @@ static void Display_EvtcRpcStatus(const HealTableOptions& pHealingOptions)
 	if (status.Connected == true)
 	{
 		uint64_t seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - status.ConnectTime).count();
-		ImGui::TextColored(ImVec4(0.0f, 0.75f, 0.0f, 1.0f), "Connected to %s for %llu seconds", status.Endpoint.c_str(), seconds);
+		ImGui::TextColored(ImVec4(0.0f, 0.75f, 0.0f, 1.0f), u8"已連線到 %s %llu 秒", status.Endpoint.c_str(), seconds);
 	}
 	else if (pHealingOptions.EvtcRpcEnabled == false)
 	{
-		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.2f, 1.0f), "Not connected since live stats sharing is disabled");
+		ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.2f, 1.0f), u8"由於未啟用即時統計資料共享而未進行連接");
 	}
 	else
 	{
-		ImGui::TextColored(ImVec4(0.75f, 0.0f, 0.0f, 1.0f), "Failed connecting to %s. Retrying...", status.Endpoint.c_str());
+		ImGui::TextColored(ImVec4(0.75f, 0.0f, 0.0f, 1.0f), u8"無法連線到 %s。 重試中...", status.Endpoint.c_str());
 	}
 }
 
 void Display_AddonOptions(HealTableOptions& pHealingOptions)
 {
-	ImGui::TextUnformatted("Heal Stats");
+	ImGui::TextUnformatted(u8"治療統計");
 	ImGuiEx::SmallIndent();
 	for (uint32_t i = 0; i < HEAL_WINDOW_COUNT; i++)
 	{
@@ -675,11 +674,11 @@ void Display_AddonOptions(HealTableOptions& pHealingOptions)
 	}
 	ImGuiEx::SmallUnindent();
 
-	ImGuiEx::ComboMenu("auto updates", pHealingOptions.AutoUpdateSetting, AUTO_UPDATE_SETTING_ITEMS);
-	ImGuiEx::SmallCheckBox("debug mode", &pHealingOptions.DebugMode);
+	ImGuiEx::ComboMenu(u8"自動更新", pHealingOptions.AutoUpdateSetting, AUTO_UPDATE_SETTING_ITEMS);
+	ImGuiEx::SmallCheckBox(u8"除錯模式", &pHealingOptions.DebugMode);
 	ImGuiEx::AddTooltipToLastItem(
-		"Includes debug data in target and skill names.\n"
-		"Turn this on before taking screenshots of potential calculation issues.");
+		u8"在目標和技能名稱中包括除錯資料。\n"
+		u8"在擷取潛在計算問題截圖前，打開此選項。");
 
 	spdlog::string_view_t log_level_names[] = SPDLOG_LEVEL_NAMES;
 	std::string log_level_items[std::size(log_level_names)];
@@ -688,42 +687,40 @@ void Display_AddonOptions(HealTableOptions& pHealingOptions)
 		log_level_items[i] = std::string_view(log_level_names[i].data(), log_level_names[i].size());
 	}
 
-	if (ImGuiEx::ComboMenu("debug logging", pHealingOptions.LogLevel, LOG_LEVEL_ITEMS) == true)
+	if (ImGuiEx::ComboMenu(u8"除錯紀錄", pHealingOptions.LogLevel, LOG_LEVEL_ITEMS) == true)
 	{
 		Log_::SetLevel(pHealingOptions.LogLevel);
 	}
 	ImGuiEx::AddTooltipToLastItem(
-		"If not set to off, enables logging at the specified log level.\n"
-		"Logs are saved in addons\\logs\\arcdps_healing_stats\\. Logging\n"
-		"will have a small impact on performance.");
+		u8"如果未設定為關閉，將開啟特定紀錄嚴重性層級的日誌紀錄。\n"
+		u8"日誌保存在 addons\\logs\\arcdps_healing_stats\\。\n"
+		u8"日誌記錄將對效能造成一點影響。");
 
 	ImGui::Separator();
 
-	if (ImGuiEx::SmallCheckBox("log healing to EVTC logs", &pHealingOptions.EvtcLoggingEnabled) == true)
+	if (ImGuiEx::SmallCheckBox(u8"將治療紀錄到 EVTC 日誌裡", &pHealingOptions.EvtcLoggingEnabled) == true)
 	{
 		GlobalObjects::EVENT_PROCESSOR->SetEvtcLoggingEnabled(pHealingOptions.EvtcLoggingEnabled);
 	}
 
-	if (ImGuiEx::SmallCheckBox("enable live stats sharing", &pHealingOptions.EvtcRpcEnabled) == true)
+	if (ImGuiEx::SmallCheckBox(u8"啟用即時統計資料共享", &pHealingOptions.EvtcRpcEnabled) == true)
 	{
 		GlobalObjects::EVTC_RPC_CLIENT->SetEnabledStatus(pHealingOptions.EvtcRpcEnabled);
 	}
 	ImGuiEx::AddTooltipToLastItem(
-		"Enables live sharing of healing statistics with other\n"
-		"players in your squad. This is done through a central server\n"
-		"(see option below). After enabling live sharing, it might not\n"
-		"work properly until after changing map instance so all squad\n"
-		"members are properly detected.\n"
-		"\n"
-		"The stats shared from other players can be viewed through a\n"
-		"heal stats window with its data source set to \"%s\"\n"
-		"\n"
-		"Enabling this option has a small impact on performance, and\n"
-		"will put some additional load on your connection (a maximum\n"
-		"of about 10 kiB/s up and 100 kiB/s down). The download\n"
-		"connection usage increases the more players in your squad\n"
-		"have live stats sharing enabled, the upload connection usage\n"
-		"does not."
+		u8"允許與小隊中的其他玩家即時共享治療統計資料。\n"
+		u8"這是透過中央伺服器完成的(請參閱下面的選項)\n"
+		u8"啟用即時共享後，在換地圖以便正確檢測到所有\n"
+		u8"小隊成員之前，它可能無法正常工作\n"
+		u8"\n"
+		u8"可透過治療統計視窗查看其他玩家分享的統計資料\n"
+		u8"，其資料來源設定為 \"%s\"\n"
+		u8"\n"
+		u8"啟用此選項將對效能造成一點影響，並且會對您的\n"
+		u8"網路連線造成一些額外負載(最多約 10 kiB/s 上傳\n"
+		u8"和 100 kiB/s 下載)。\n"
+		u8"團隊中啟用即時統計資料共享的玩家越多，下載連線\n"
+		u8"使用量就會增加，而上傳連線使用量則不會。"
 		, DATA_SOURCE_ITEMS[DataSource::PeersOutgoing]);
 
 	if (pHealingOptions.EvtcRpcEnabled == false)
@@ -731,7 +728,7 @@ void Display_AddonOptions(HealTableOptions& pHealingOptions)
 		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
 		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(128, 128, 128, 255));
 	}
-	if (ImGuiEx::SmallCheckBox("live stats sharing budget mode", &pHealingOptions.EvtcRpcBudgetMode) == true)
+	if (ImGuiEx::SmallCheckBox(u8"即時統計資料共享 節省模式", &pHealingOptions.EvtcRpcBudgetMode) == true)
 	{
 		GlobalObjects::EVTC_RPC_CLIENT->SetBudgetMode(pHealingOptions.EvtcRpcBudgetMode);
 	}
@@ -741,22 +738,20 @@ void Display_AddonOptions(HealTableOptions& pHealingOptions)
 		ImGui::PopStyleColor();
 	}
 	ImGuiEx::AddTooltipToLastItem(
-		"Only send a minimal subset of events to peers. This reduces\n"
-		"the amount of upload bandwidth used by the addon. Healing\n"
-		"statistics shown will still be fully accurate, however combat\n"
-		"times as viewed by other players may be slightly inaccurate\n"
-		"while still in combat. If those players are running a version\n"
-		"of the addon released before budget mode support was\n"
-		"introduced, the combat times may be highly inaccurate, even\n"
-		"when out of combat. This option has no effect on download\n"
-		"bandwidth usage, only upload. Expected connection usage with\n"
-		"this option enabled should go down to <1kiB/s up.");
+		u8"只向團員發送事件的最小子集。 這減少了此插件\n"
+		u8"使用的上傳頻寬量。 顯示的治療統計資料仍然完全\n"
+		u8"準確，但是其他玩家在戰鬥中看到的戰鬥時間可能\n"
+		u8"會稍微不準確。 如果這些玩家使用的是在引入節省\n"
+		u8"模式支援之前發布的插件版本，則即使在非戰鬥狀態下\n"
+		u8"，戰鬥時間也可能非常不準確。 此選項對下載頻寬\n"
+		u8"使用量沒有影響，只影響上傳。 啟用此選項後，\n"
+		u8"預期連線使用量應降於 < 1 kiB/s 上傳。");
 
 	float oldPosY = ImGui::GetCursorPosY();
 	ImGui::BeginGroup();
 
 	ImGui::SetCursorPosY(oldPosY + ImGui::GetStyle().FramePadding.y);
-	ImGui::Text("live stats sharing hotkey");
+	ImGui::Text(u8"即時統計資料共享 熱鍵");
 
 	ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
 	ImGui::SetCursorPosY(oldPosY);
@@ -768,25 +763,25 @@ void Display_AddonOptions(HealTableOptions& pHealingOptions)
 	ImGui::Text("(%s)", VirtualKeyToString(pHealingOptions.EvtcRpcEnabledHotkey).c_str());
 
 	ImGui::EndGroup();
-	ImGuiEx::AddTooltipToLastItem("Numerical value (virtual key code) for the key\n"
-		"used to toggle live stats sharing");
+	ImGuiEx::AddTooltipToLastItem(u8"用於切換即時統計資料共享按鍵的數值\n"
+		u8"(虛擬按鍵代碼)");
 
-	ImGuiEx::SmallInputText("evtc rpc server", pHealingOptions.EvtcRpcEndpoint, sizeof(pHealingOptions.EvtcRpcEndpoint));
+	ImGuiEx::SmallInputText(u8"EVTC RPC 伺服器", pHealingOptions.EvtcRpcEndpoint, sizeof(pHealingOptions.EvtcRpcEndpoint));
 	ImGuiEx::AddTooltipToLastItem(
-		"The server to communicate with for evtc_rpc communication\n"
-		"(allowing other squad members to see your healing stats).\n"
-		"All local combat events will be sent to this server. Make\n"
-		"sure you trust it.");
+		u8"用於 EVTC RPC 通訊的伺服器\n"
+		u8"(允許其他團隊成員看到你的治療統計數據)。\n"
+		u8"所有本機戰鬥事件都會傳送到該伺服器。\n"
+		u8"請先確保您信任它。");
 	Display_EvtcRpcStatus(pHealingOptions);
 
 	ImGui::Separator();
 
-	if (ImGui::Button("reset all settings") == true)
+	if (ImGui::Button(u8"重置所有設定") == true)
 	{
 		pHealingOptions.Reset();
 		LogD("Reset settings");
 	}
-	ImGuiEx::AddTooltipToLastItem("Resets all global and window specific settings to their default values.");
+	ImGuiEx::AddTooltipToLastItem(u8"將所有全域和視窗特定設定重設為其預設值。");
 }
 
 void FindAndResolveCyclicDependencies(HealTableOptions& pHealingOptions, size_t pStartIndex)

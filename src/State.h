@@ -57,9 +57,9 @@ struct HealWindowOptions
 
 	bool ShowProgressBars = true;
 	char Name[MAX_HEAL_WINDOW_NAME + 1] = {};
-	char TitleFormat[MAX_HEAL_WINDOW_TITLE + 1] = "{1} ({4}/s, {7}s in combat)";
-	char EntryFormat[MAX_HEAL_WINDOW_ENTRY + 1] = "{1} ({4}/s, {7}%)";
-	char DetailsEntryFormat[MAX_HEAL_WINDOW_ENTRY + 1] = "{1} ({4}/s, {7}%)";
+	char TitleFormat[MAX_HEAL_WINDOW_TITLE + 1] = u8"{1} ({4}/¬í, ¶i¤J¾Ô°«{7}¬í)";
+	char EntryFormat[MAX_HEAL_WINDOW_ENTRY + 1] = u8"{1} ({4}/¬í, {7}%)";
+	char DetailsEntryFormat[MAX_HEAL_WINDOW_ENTRY + 1] = u8"{1} ({4}/¬í, {7}%)";
 
 	ImGuiWindowFlags_ WindowFlags = ImGuiWindowFlags_None;
 
