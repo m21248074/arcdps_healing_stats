@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <imgui/imgui.h>
 #include <ArcdpsExtension/arcdps_structs.h>
@@ -74,9 +74,9 @@ struct HealWindowOptions
 	bool SelfOnly = false;
 	bool AnonymousMode = false;
 	char Name[MAX_HEAL_WINDOW_NAME + 1] = {};
-	char TitleFormat[MAX_HEAL_WINDOW_TITLE + 1] = u8"{1} ({4}/¬í, ¶i¤J¾Ô°«{7}¬í)";
-	char EntryFormat[MAX_HEAL_WINDOW_ENTRY + 1] = u8"{1} ({4}/¬í, {7}%)";
-	char DetailsEntryFormat[MAX_HEAL_WINDOW_ENTRY + 1] = u8"{1} ({4}/¬í, {7}%)";
+	char TitleFormat[MAX_HEAL_WINDOW_TITLE + 1] = "{1} ({4} / ç§’, é€²å…¥æˆ°é¬¥{7}ç§’)";
+	char EntryFormat[MAX_HEAL_WINDOW_ENTRY + 1] = "{1} ({4}/ç§’, {7}%)";
+	char DetailsEntryFormat[MAX_HEAL_WINDOW_ENTRY + 1] = "{1} ({4}/ç§’, {7}%)";
 
 	ImGuiWindowFlags_ WindowFlags = ImGuiWindowFlags_None;
 

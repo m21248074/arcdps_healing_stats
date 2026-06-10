@@ -1,4 +1,4 @@
-#include "Options.h"
+ï»¿#include "Options.h"
 
 #include "AddonVersion.h"
 #include "AggregatedStats.h"
@@ -101,43 +101,43 @@ DetailsWindowState::DetailsWindowState(const AggregatedStatsEntry& pEntry)
 HealTableOptions::HealTableOptions()
 {
 	Windows[0].DataSourceChoice = DataSource::Totals;
-	snprintf(Windows[0].Name, sizeof(Windows[0].Name), "%s", u8"Á`­p");
-	snprintf(Windows[0].TitleFormat, sizeof(Windows[0].TitleFormat), "%s", u8"Á`­p (¶i¤J¾Ô°«{1}¬í)");
-	snprintf(Windows[0].EntryFormat, sizeof(Windows[0].EntryFormat), "%s", u8"{1} ({4}/¬í)");
+	snprintf(Windows[0].Name, sizeof(Windows[0].Name), "%s", "ç¸½è¨ˆ");
+	snprintf(Windows[0].TitleFormat, sizeof(Windows[0].TitleFormat), "%s", "ç¸½è¨ˆ (é€²å…¥æˆ°é¬¥{1}ç§’)");
+	snprintf(Windows[0].EntryFormat, sizeof(Windows[0].EntryFormat), "%s", "{1} ({4}/ç§’)");
 
 	Windows[1].DataSourceChoice = DataSource::Agents;
-	snprintf(Windows[1].Name, sizeof(Windows[1].Name), "%s", u8"¥Ø¼Ğ");
-	snprintf(Windows[1].TitleFormat, sizeof(Windows[1].TitleFormat), "%s", u8"¥Ø¼Ğ {1} ({4}/¬í¡A¶i¤J¾Ô°«{7}¬í)");
+	snprintf(Windows[1].Name, sizeof(Windows[1].Name), "%s", "ç›®æ¨™");
+	snprintf(Windows[1].TitleFormat, sizeof(Windows[1].TitleFormat), "%s", "ç›®æ¨™ {1} ({4}/ç§’ï¼Œé€²å…¥æˆ°é¬¥{7}ç§’)");
 
 	Windows[2].DataSourceChoice = DataSource::Skills;
-	snprintf(Windows[2].Name, sizeof(Windows[2].Name), "%s", u8"§Ş¯à");
-	snprintf(Windows[2].TitleFormat, sizeof(Windows[2].TitleFormat), "%s", u8"§Ş¯à {1} ({4}/¬í¡A¶i¤J¾Ô°«{7}¬í)");
+	snprintf(Windows[2].Name, sizeof(Windows[2].Name), "%s", "æŠ€èƒ½");
+	snprintf(Windows[2].TitleFormat, sizeof(Windows[2].TitleFormat), "%s", "æŠ€èƒ½ {1} ({4}/ç§’ï¼Œé€²å…¥æˆ°é¬¥{7}ç§’)");
 
 	Windows[3].DataSourceChoice = DataSource::Agents;
-	snprintf(Windows[3].Name, sizeof(Windows[3].Name), "%s", u8"¥Ø¼Ğ (©R¤¤¼Æ)");
-	snprintf(Windows[3].TitleFormat, sizeof(Windows[3].TitleFormat), "%s", u8"¥Ø¼Ğ {1} ({5}/¨C©R¤¤, {2} ¦¸©R¤¤)");
-	snprintf(Windows[3].EntryFormat, sizeof(Windows[3].EntryFormat), "%s", u8"{1} ({5}/¨C©R¤¤, {2} ¦¸©R¤¤)");
-	snprintf(Windows[3].DetailsEntryFormat, sizeof(Windows[3].DetailsEntryFormat), "%s", u8"{1} ({5}/¨C©R¤¤, {2} ¦¸©R¤¤)");
+	snprintf(Windows[3].Name, sizeof(Windows[3].Name), "%s", "ç›®æ¨™ (å‘½ä¸­æ•¸)");
+	snprintf(Windows[3].TitleFormat, sizeof(Windows[3].TitleFormat), "%s", "ç›®æ¨™ {1} ({5}/æ¯å‘½ä¸­, {2} æ¬¡å‘½ä¸­)");
+	snprintf(Windows[3].EntryFormat, sizeof(Windows[3].EntryFormat), "%s", "{1} ({5}/æ¯å‘½ä¸­, {2} æ¬¡å‘½ä¸­)");
+	snprintf(Windows[3].DetailsEntryFormat, sizeof(Windows[3].DetailsEntryFormat), "%s", "{1} ({5}/æ¯å‘½ä¸­, {2} æ¬¡å‘½ä¸­)");
 
 	Windows[4].DataSourceChoice = DataSource::Skills;
-	snprintf(Windows[4].Name, sizeof(Windows[4].Name), "%s", u8"§Ş¯à (©R¤¤¼Æ)");
-	snprintf(Windows[4].TitleFormat, sizeof(Windows[4].TitleFormat), "%s", u8"§Ş¯à {1} ({5}/¨C©R¤¤, {2} ¦¸©R¤¤)");
-	snprintf(Windows[4].EntryFormat, sizeof(Windows[4].EntryFormat), "%s", u8"{1} ({5}/¨C©R¤¤, {2} ¦¸©R¤¤)");
-	snprintf(Windows[4].DetailsEntryFormat, sizeof(Windows[4].DetailsEntryFormat), u8"%s", "{1} ({5}/¨C©R¤¤, {2} ¦¸©R¤¤)");
+	snprintf(Windows[4].Name, sizeof(Windows[4].Name), "%s", "æŠ€èƒ½ (å‘½ä¸­æ•¸)");
+	snprintf(Windows[4].TitleFormat, sizeof(Windows[4].TitleFormat), "%s", "æŠ€èƒ½ {1} ({5}/æ¯å‘½ä¸­, {2} æ¬¡å‘½ä¸­)");
+	snprintf(Windows[4].EntryFormat, sizeof(Windows[4].EntryFormat), "%s", "{1} ({5}/æ¯å‘½ä¸­, {2} æ¬¡å‘½ä¸­)");
+	snprintf(Windows[4].DetailsEntryFormat, sizeof(Windows[4].DetailsEntryFormat), "%s", "{1} ({5}/æ¯å‘½ä¸­, {2} æ¬¡å‘½ä¸­)");
 
 	Windows[5].DataSourceChoice = DataSource::PeersOutgoing;
-	snprintf(Windows[5].Name, sizeof(Windows[5].Name), "%s", u8"¶¤­û¿é¥XªvÀø");
-	snprintf(Windows[5].TitleFormat, sizeof(Windows[5].TitleFormat), "%s", u8"¿é¥XªvÀø {1} ({4}/¬í¡A¶i¤J¾Ô°«{7}¬í)");
+	snprintf(Windows[5].Name, sizeof(Windows[5].Name), "%s", "éšŠå“¡è¼¸å‡ºæ²»ç™‚");
+	snprintf(Windows[5].TitleFormat, sizeof(Windows[5].TitleFormat), "%s", "è¼¸å‡ºæ²»ç™‚ {1} ({4}/ç§’ï¼Œé€²å…¥æˆ°é¬¥{7}ç§’)");
 
 	Windows[6].DataSourceChoice = DataSource::PeersOutgoing;
 	Windows[6].ExcludeHealing = true;
 	Windows[6].ExcludeBarrierGeneration = false;
-	snprintf(Windows[6].Name, sizeof(Windows[6].Name), "%s", "Peers barrier generation");
-	snprintf(Windows[6].TitleFormat, sizeof(Windows[6].TitleFormat), "%s", "Barrier generation {1} ({4}/s, {7}s in combat)");
+	snprintf(Windows[6].Name, sizeof(Windows[6].Name), "%s", "éšŠå‹å±éšœç”¢ç”Ÿ");
+	snprintf(Windows[6].TitleFormat, sizeof(Windows[6].TitleFormat), "%s", "å±éšœç”¢ç”Ÿ {1} ({4}/ç§’ï¼Œé€²å…¥æˆ°é¬¥{7}ç§’)");
 
 	Windows[9].DataSourceChoice = DataSource::Combined;
-	snprintf(Windows[9].Name, sizeof(Windows[9].Name), "%s", u8"ºî¦X");
-	snprintf(Windows[9].TitleFormat, sizeof(Windows[9].TitleFormat), "%s", u8"ºî¦X {1} ({4}/¬í¡A¶i¤J¾Ô°«{7}¬í)");
+	snprintf(Windows[9].Name, sizeof(Windows[9].Name), "%s", "ç¶œåˆ");
+	snprintf(Windows[9].TitleFormat, sizeof(Windows[9].TitleFormat), "%s", "ç¶œåˆ {1} ({4}/ç§’ï¼Œé€²å…¥æˆ°é¬¥{7}ç§’)");
 }
 
 void HealTableOptions::Load(const char* pConfigPath)
