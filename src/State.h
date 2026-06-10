@@ -1,8 +1,7 @@
 #pragma once
 
-#include "arcdps_structs.h"
-#include "imgui.h"
-
+#include <imgui/imgui.h>
+#include <ArcdpsExtension/arcdps_structs.h>
 #include <nlohmann/json.hpp>
 
 #include <cstdint>
@@ -27,8 +26,12 @@ enum class SortOrder
 {
 	AscendingAlphabetical = 0,
 	DescendingAlphabetical = 1,
-	AscendingSize = 2,
-	DescendingSize = 3,
+	AscendingTotalOutgoingSize = 2,
+	DescendingTotalOutgoingSize = 3,
+	AscendingHealSize = 4,
+	DescendingHealSize = 5,
+	AscendingBarrierGenerationSize = 6,
+	DescendingBarrierGenerationSize = 7,
 	Max
 };
 
@@ -46,7 +49,7 @@ struct HealWindowOptions
 	bool Shown = false;
 
 	DataSource DataSourceChoice = DataSource::Agents;
-	SortOrder SortOrderChoice = SortOrder::DescendingSize;
+	SortOrder SortOrderChoice = SortOrder::DescendingTotalOutgoingSize;
 	CombatEndCondition CombatEndConditionChoice = CombatEndCondition::LastDamageEvent;
 
 	bool ExcludeGroup = false;
@@ -54,8 +57,22 @@ struct HealWindowOptions
 	bool ExcludeOffSquad = false;
 	bool ExcludeMinions = true;
 	bool ExcludeUnmapped = true;
+	bool ExcludeHealing = false;
+	bool ExcludeBarrierGeneration = true;
 
 	bool ShowProgressBars = true;
+	bool UseSubgroupForBarColour = false;
+	bool UseProfessionForBarColour = false;
+	bool IndexNumbers = false;
+	bool ProfessionText = false;
+	bool ProfessionIcons = false;
+	bool ReplacePlayerWithAccountName = false;
+	bool UseProfessionForNameColour = false;
+	bool UseSubgroupForNameColour = false;
+	bool SelfOnTop = false;
+	bool HideSelfFromList = false;
+	bool SelfOnly = false;
+	bool AnonymousMode = false;
 	char Name[MAX_HEAL_WINDOW_NAME + 1] = {};
 	char TitleFormat[MAX_HEAL_WINDOW_TITLE + 1] = u8"{1} ({4}/¬í, ¶i¤J¾Ô°«{7}¬í)";
 	char EntryFormat[MAX_HEAL_WINDOW_ENTRY + 1] = u8"{1} ({4}/¬í, {7}%)";
@@ -74,7 +91,7 @@ struct HealWindowOptions
 	ImGuiID AnchorWindowId = 0;
 
 	bool AutoResize = false;
-	size_t MaxNameLength = 0;
+	int64_t MaxNameLength = 0;
 	size_t MinLinesDisplayed = 0;
 	size_t MaxLinesDisplayed = 10;
 	size_t FixedWindowWidth = 400;

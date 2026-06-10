@@ -2,12 +2,20 @@
 
 #include "AggregatedStatsCollection.h"
 #include "Exports.h"
+#include "KeysDown.h"
 #include "ImGuiEx.h"
 #include "Log.h"
+#include "../resource.h"
+#include "SpecializationData.h"
 #include "Utilities.h"
-#include "Widgets.h"
+
+#include <ArcdpsExtension/IconLoader.h>
+#include <ArcdpsExtension/Widgets.h>
 
 #include <array>
+#include <filesystem>
+#include <map>
+#include <tuple>
 #include <Windows.h>
 
 static constexpr EnumStringArray<AutoUpdateSettingEnum> AUTO_UPDATE_SETTING_ITEMS{
@@ -16,7 +24,8 @@ static constexpr EnumStringArray<AutoUpdateSettingEnum> AUTO_UPDATE_SETTING_ITEM
 static constexpr EnumStringArray<DataSource> DATA_SOURCE_ITEMS{
 	u8"目標", u8"技能", u8"總計", u8"綜合", u8"團員輸出治療"};
 static constexpr EnumStringArray<SortOrder> SORT_ORDER_ITEMS{
-	u8"按字母由A到Z(升序)", u8"按字母由Z到A(降序)", u8"按每秒治療量由小到大(升序)", u8"按每秒治療量由大到小(降序)"};
+	// u8"按字母由A到Z(升序)", u8"按字母由Z到A(降序)", u8"按每秒治療量由小到大(升序)", u8"按每秒治療量由大到小(降序)"};
+	"alphabetical ascending", "alphabetical descending", "total outgoing per second ascending", "total outgoing per second descending", "heal per second ascending", "heal per second descending", "barrier generation per second ascending", "barrier generation per second descending"};
 static constexpr EnumStringArray<CombatEndCondition> COMBAT_END_CONDITION_ITEMS{
 	u8"離開戰鬥", u8"最後傷害事件", u8"最後治療事件", u8"最後傷害/治療事件"};
 static constexpr EnumStringArray<spdlog::level::level_enum, 7> LOG_LEVEL_ITEMS{
@@ -25,7 +34,228 @@ static constexpr EnumStringArray<spdlog::level::level_enum, 7> LOG_LEVEL_ITEMS{
 static constexpr EnumStringArray<Position, static_cast<size_t>(Position::WindowRelative) + 1> POSITION_ITEMS{
 	u8"手動", u8"螢幕相對位置", u8"視窗相對位置"};
 static constexpr EnumStringArray<CornerPosition, static_cast<size_t>(CornerPosition::BottomRight) + 1> CORNER_POSITION_ITEMS{
-	u8"左上", u8"右上", u8"左下", u8"右下"};
+	// u8"左上", u8"右上", u8"左下", u8"右下"};
+	"top-left", "top-right", "bottom-left", "bottom-right"};
+
+/* Table with mapping between profession and elite specialization pair and their abbreviation and icon resource ID/icon override name.
+*  The resource is loaded at runtime, with the table updated with IconLoader texture unique IDs and a pointer to the texture.
+*  Users can override the icon with pngs in the addons\arcdps\icons\ folder, same as arcdps, otherwise the default ones are used.
+*  Until then, the texture pointer will be nullptr.
+*  The table is supposed to be accessed only at startup and during a frame, so only single threaded context.
+*/
+static std::map<std::pair<Prof, SpecializationId>, SpecializationData> ProfessionEliteMapping{
+	{{Prof::PROF_UNKNOWN, static_cast<SpecializationId>(0xFFFFFFFF)}, {"(???)", IDB_PNG_SPEC_NONE}},
+	// Guardian
+	{{Prof::PROF_GUARD, SpecializationId::None}, {"(Gdn)", IDB_PNG_SPEC_GUARDIAN, "001.png"}},
+	{{Prof::PROF_GUARD, SpecializationId::Guardian_Dragonhunter}, {"(Dgh)", IDB_PNG_SPEC_DRAGONHUNTER, "e101.png"}},
+	{{Prof::PROF_GUARD, SpecializationId::Guardian_Firebrand}, {"(Fbd)", IDB_PNG_SPEC_FIREBRAND, "e102.png"}},
+	{{Prof::PROF_GUARD, SpecializationId::Guardian_Willbender}, {"(Wbd)", IDB_PNG_SPEC_WILLBENDER, "e103.png"}},
+	{{Prof::PROF_GUARD, SpecializationId::Guardian_Luminary}, {"(Lum)", IDB_PNG_SPEC_LUMINARY, "e104.png"}},
+	// Warrior
+	{{Prof::PROF_WARRIOR, SpecializationId::None}, {"(War)", IDB_PNG_SPEC_WARRIOR, "002.png"}},
+	{{Prof::PROF_WARRIOR, SpecializationId::Warrior_Berserker}, {"(Brs)", IDB_PNG_SPEC_BERSERKER, "e201.png"}},
+	{{Prof::PROF_WARRIOR, SpecializationId::Warrior_Spellbreaker}, {"(Spb)", IDB_PNG_SPEC_SPELLBREAKER, "e202.png"}},
+	{{Prof::PROF_WARRIOR, SpecializationId::Warrior_Bladesworn}, {"(Bds)", IDB_PNG_SPEC_BLADESWORN, "e203.png"}},
+	{{Prof::PROF_WARRIOR, SpecializationId::Warrior_Paragon}, {"(Par)", IDB_PNG_SPEC_PARAGON, "e204.png"}},
+	// Engineer
+	{{Prof::PROF_ENGINEER, SpecializationId::None}, {"(Eng)", IDB_PNG_SPEC_ENGINEER, "003.png"}},
+	{{Prof::PROF_ENGINEER, SpecializationId::Engineer_Scrapper}, {"(Scr)", IDB_PNG_SPEC_SCRAPPER, "e301.png"}},
+	{{Prof::PROF_ENGINEER, SpecializationId::Engineer_Holosmith}, {"(Hls)", IDB_PNG_SPEC_HOLOSMITH, "e302.png"}},
+	{{Prof::PROF_ENGINEER, SpecializationId::Engineer_Mechanist}, {"(Mec)", IDB_PNG_SPEC_MECHANIST, "e303.png"}},
+	{{Prof::PROF_ENGINEER, SpecializationId::Engineer_Amalgam}, {"(Amg)", IDB_PNG_SPEC_AMALGAM, "e304.png"}},
+	// Ranger
+	{{Prof::PROF_RANGER, SpecializationId::None}, {"(Rgr)", IDB_PNG_SPEC_RANGER, "004.png"}},
+	{{Prof::PROF_RANGER, SpecializationId::Ranger_Druid}, {"(Dru)", IDB_PNG_SPEC_DRUID, "e401.png"}},
+	{{Prof::PROF_RANGER, SpecializationId::Ranger_Soulbeast}, {"(Slb)", IDB_PNG_SPEC_SOULBEAST, "e402.png"}},
+	{{Prof::PROF_RANGER, SpecializationId::Ranger_Untamed}, {"(Unt)", IDB_PNG_SPEC_UNTAMED, "e403.png"}},
+	{{Prof::PROF_RANGER, SpecializationId::Ranger_Galeshot}, {"(Gls)", IDB_PNG_SPEC_GALESHOT, "e404.png"}},
+	// Thief
+	{{Prof::PROF_THIEF, SpecializationId::None}, {"(Thf)", IDB_PNG_SPEC_THIEF, "005.png"}},
+	{{Prof::PROF_THIEF, SpecializationId::Thief_Daredevil}, {"(Dar)", IDB_PNG_SPEC_DAREDEVIL, "e501.png"}},
+	{{Prof::PROF_THIEF, SpecializationId::Thief_Deadeye}, {"(Ded)", IDB_PNG_SPEC_DEADEYE, "e502.png"}},
+	{{Prof::PROF_THIEF, SpecializationId::Thief_Specter}, {"(Spe)", IDB_PNG_SPEC_SPECTER, "e503.png"}},
+	{{Prof::PROF_THIEF, SpecializationId::Thief_Antiquary}, {"(Atq)", IDB_PNG_SPEC_ANTIQUARY, "e504.png"}},
+	// Elementalist
+	{{Prof::PROF_ELE, SpecializationId::None}, {"(Ele)", IDB_PNG_SPEC_ELEMENTALIST, "006.png"}},
+	{{Prof::PROF_ELE, SpecializationId::Elementalist_Tempest}, {"(Tmp)", IDB_PNG_SPEC_TEMPEST, "e601.png"}},
+	{{Prof::PROF_ELE, SpecializationId::Elementalist_Weaver}, {"(Wea)", IDB_PNG_SPEC_WEAVER, "e602.png"}},
+	{{Prof::PROF_ELE, SpecializationId::Elementalist_Catalyst}, {"(Cat)", IDB_PNG_SPEC_CATALYST, "e603.png"}},
+	{{Prof::PROF_ELE, SpecializationId::Elementalist_Evoker}, {"(Evk)", IDB_PNG_SPEC_EVOKER, "e604.png"}},
+	// Mesmer
+	{{Prof::PROF_MESMER, SpecializationId::None}, {"(Mes)", IDB_PNG_SPEC_MESMER, "007.png"}},
+	{{Prof::PROF_MESMER, SpecializationId::Mesmer_Chronomancer}, {"(Chr)", IDB_PNG_SPEC_CHRONOMANCER, "e701.png"}},
+	{{Prof::PROF_MESMER, SpecializationId::Mesmer_Mirage}, {"(Mir)", IDB_PNG_SPEC_MIRAGE, "e702.png"}},
+	{{Prof::PROF_MESMER, SpecializationId::Mesmer_Virtuoso}, {"(Vir)", IDB_PNG_SPEC_VIRTUOSO, "e703.png"}},
+	{{Prof::PROF_MESMER, SpecializationId::Mesmer_Troubadour}, {"(Tbd)", IDB_PNG_SPEC_TROUBADOUR, "e704.png"}},
+	// Necromancer
+	{{Prof::PROF_NECRO, SpecializationId::None}, {"(Nec)", IDB_PNG_SPEC_NECROMANCER, "008.png"}},
+	{{Prof::PROF_NECRO, SpecializationId::Necromancer_Reaper}, {"(Rea)", IDB_PNG_SPEC_REAPER, "e801.png"}},
+	{{Prof::PROF_NECRO, SpecializationId::Necromancer_Scourge}, {"(Scg)", IDB_PNG_SPEC_SCOURGE, "e802.png"}},
+	{{Prof::PROF_NECRO, SpecializationId::Necromancer_Harbinger}, {"(Har)", IDB_PNG_SPEC_HARBINGER, "e803.png"}},
+	{{Prof::PROF_NECRO, SpecializationId::Necromancer_Ritualist}, {"(Rit)", IDB_PNG_SPEC_RITUALIST, "e804.png"}},
+	// Revenant
+	{{Prof::PROF_RENEGADE, SpecializationId::None}, {"(Rev)", IDB_PNG_SPEC_REVENANT, "009.png"}},
+	{{Prof::PROF_RENEGADE, SpecializationId::Revenant_Herald}, {"(Her)", IDB_PNG_SPEC_HERALD, "e901.png"}},
+	{{Prof::PROF_RENEGADE, SpecializationId::Revenant_Renegade}, {"(Ren)", IDB_PNG_SPEC_RENEGADE, "e902.png"}},
+	{{Prof::PROF_RENEGADE, SpecializationId::Revenant_Vindicator}, {"(Vin)", IDB_PNG_SPEC_VINDICATOR, "e903.png"}},
+	{{Prof::PROF_RENEGADE, SpecializationId::Revenant_Conduit}, {"(Cdt)", IDB_PNG_SPEC_CONDUIT, "e904.png"}},
+};
+
+static const HealedAgent AnonymousAgent{
+	0, "", "", 0, false, true, Prof::PROF_UNKNOWN, 0xFFFFFFFF
+};
+
+void LoadIcons(HMODULE pCurrentModule, void* pID3DPtr, uint32_t pImGuiVersion)
+{
+	ID3D11Device* d3d11 = nullptr;
+	if (pImGuiVersion != 0)
+	{
+		IDXGISwapChain* d3d11SwapChain = static_cast<IDXGISwapChain*>(pID3DPtr);
+		d3d11SwapChain->GetDevice(__uuidof(d3d11), (void**)&d3d11);
+	}
+
+	auto& iconLoader = ArcdpsExtension::IconLoader::init(pCurrentModule, d3d11);
+
+	// This happens only in unit tests
+	if (d3d11 == nullptr)
+	{
+		return;
+	}
+
+	size_t iconTextureId = 0;
+
+	for (auto& [key, specializationData] : ProfessionEliteMapping)
+	{
+		specializationData.IconTextureId = ++iconTextureId;
+
+		// Try to load the icon locally from "addons\arcdps\icons\" if the user provided them, otherwise fallback to the default ones
+		std::string iconPath = "addons\\arcdps\\icons\\" + specializationData.IconName;
+		if (specializationData.IconName.empty() == false && std::filesystem::exists(iconPath))
+		{
+			iconLoader.RegisterFile(specializationData.IconTextureId, iconPath.c_str());
+		}
+		else
+		{
+			iconLoader.RegisterResource(specializationData.IconTextureId, specializationData.IconResourceId);
+		}
+	}
+}
+
+static std::string GetProfessionText(Prof pProfession, uint32_t pElite)
+{
+	auto it = ProfessionEliteMapping.find({ pProfession, static_cast<SpecializationId>(pElite) });
+	if (it != ProfessionEliteMapping.end())
+	{
+		return it->second.Abbreviation;
+	}
+	return "(???)";
+}
+
+/* Returns a pointer to the icon texture for the given profession and elite specialization if it exists.
+*  It returns nullptr until IconLoader has finished loading the texture.
+*/
+static void* GetProfessionIcon(Prof pProfession, uint32_t pElite, bool pFallbackToEmpty = true)
+{
+	auto it = ProfessionEliteMapping.find({ pProfession, static_cast<SpecializationId>(pElite) });
+	if (it != ProfessionEliteMapping.end() && it->second.IconResourceId != 0)
+	{
+		if (it->second.IconTextureData != nullptr)
+		{
+			return it->second.IconTextureData;
+		}
+		else
+		{
+			auto textureData = ArcdpsExtension::IconLoader::instance().Draw(it->second.IconTextureId);
+			it->second.IconTextureData = textureData;
+			return textureData;
+		}
+	}
+	else if (pFallbackToEmpty == true)
+	{
+		return GetProfessionIcon(Prof::PROF_UNKNOWN, 0xFFFFFFFF, false);
+	}
+	return nullptr;
+}
+
+static ImVec4 GetProfessionColorBase(Prof pProfession, std::optional<float> pWOverwrite = {})
+{
+	if (pProfession > Prof::PROF_RENEGADE)
+	{
+		pProfession = Prof::PROF_UNKNOWN;
+	}
+
+	if (pWOverwrite.has_value() == true)
+	{
+		ImVec4 color = GlobalObjects::COLORS[1][pProfession];
+		color.w = pWOverwrite.value();
+		return color;
+	}
+	else
+	{
+		return GlobalObjects::COLORS[1][pProfession];
+	}
+}
+
+static ImVec4 GetProfessionColorHighlight(Prof pProfession)
+{
+	if (pProfession > Prof::PROF_RENEGADE)
+	{
+		pProfession = Prof::PROF_UNKNOWN;
+	}
+	return GlobalObjects::COLORS[2][pProfession];
+}
+
+static ImVec4 GetSubgroupColorBase(uint16_t pSubgroup, std::optional<float> pWOverwrite = {})
+{
+	// Clamp subgroup to the maximum value of 15 as it's a GW2 limit
+	if (pSubgroup > 15)
+	{
+		pSubgroup = 15;
+	}
+
+	if (pWOverwrite.has_value() == true)
+	{
+		ImVec4 color = GlobalObjects::COLORS[3][pSubgroup];
+		color.w = pWOverwrite.value();
+		return color;
+	}
+	else
+	{
+		return GlobalObjects::COLORS[3][pSubgroup];
+	}
+}
+
+static ImVec4 GetSubgroupColorHighlight(uint16_t pSubgroup)
+{
+	// Clamp subgroup to the maximum value of 15 as it's a GW2 limit
+	if (pSubgroup > 15)
+	{
+		pSubgroup = 15;
+	}
+
+	return GlobalObjects::COLORS[4][pSubgroup];
+}
+
+static std::string GetIndexNumberText(size_t pIndexNumber, bool pTop, bool pSelfOnly)
+{
+	if (pTop == true)
+	{
+		return "   ";
+	}
+
+	if (pSelfOnly == true)
+	{
+		pIndexNumber = 1;
+	}
+
+	std::string result = std::to_string(pIndexNumber) + ":";
+	if (result.length() < 3)
+	{
+		result += " ";
+	}
+
+	return result;
+}
 
 static void Display_DetailsWindow(HealWindowContext& pContext, DetailsWindowState& pState, DataSource pDataSource)
 {
@@ -37,9 +267,30 @@ static void Display_DetailsWindow(HealWindowContext& pContext, DetailsWindowStat
 	char buffer[1024];
 	// Using "###" means the id of the window is calculated only from the part after the hashes (which
 	// in turn means that the name of the window can change if necessary)
-	snprintf(buffer, sizeof(buffer), "%s###HEALDETAILS.%i.%llu", pState.Name.c_str(), static_cast<int>(pDataSource), pState.Id);
+	snprintf(buffer, sizeof(buffer), "%s###HEALDETAILS.%u.%i.%llu", pState.Agent.Name.c_str(), pContext.WindowId, static_cast<int>(pDataSource), pState.Id);
 	ImGui::SetNextWindowSize(ImVec2(600, 360), ImGuiCond_FirstUseEver);
 	ImGui::Begin(buffer, &pState.IsOpen, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNavFocus);
+
+	// Adjust x size. This is based on last frame width and has to happen before we draw anything since some items are
+	// aligned to the right edge of the window.
+	{
+		ImVec2 size = ImGui::GetCurrentWindowRead()->SizeFull;
+		float minWidth = pState.LastFrameLeftSideMinWidth + pState.LastFrameRightSideMinWidth;
+		if (minWidth != 0)
+		{
+			// ItemSpacing.x is the width incurred because of the ImGui::SameLine() call between the children
+			// ImGui::GetStyle().WindowPadding.x * 2 is the width incurred because of the two ImGui::BeginChild() calls
+			// which internally apply padding between each other
+			size.x = minWidth + ImGui::GetStyle().ItemSpacing.x + ImGui::GetStyle().WindowPadding.x * 2;
+		}
+		// Make sure the window always has room for 32 lines (regardless of font size). ImGui::GetCursorPosY() accounts
+		// for the height of the window title.
+		size.y = ImGui::GetCursorPosY() + ImGui::GetTextLineHeightWithSpacing() * 32;
+
+		LogT("LastFrameLeftSideMinWidth={} LastFrameRightSideMinWidth={} x={}",
+			pState.LastFrameLeftSideMinWidth, pState.LastFrameRightSideMinWidth, size.x);
+		ImGui::SetWindowSize(size);
+	}
 
 	if (ImGui::BeginPopupContextWindow("Options##HEAL") == true)
 	{
@@ -59,42 +310,114 @@ static void Display_DetailsWindow(HealWindowContext& pContext, DetailsWindowStat
 	ImVec4 bgColor = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
 	bgColor.w = 0.0f;
 	ImGui::PushStyleColor(ImGuiCol_ChildBg, bgColor);
-	snprintf(buffer, sizeof(buffer), "##HEALDETAILS.TOTALS.%i.%llu", static_cast<int>(pDataSource), pState.Id);
-	ImGui::BeginChild(buffer, ImVec2(ImGui::GetWindowContentRegionWidth() * 0.35f, 0));
-	ImGui::Text(u8"總治療量");
-	ImGuiEx::TextRightAlignedSameLine("%llu", pState.Healing);
+	// snprintf(buffer, sizeof(buffer), "##HEALDETAILS.TOTALS.%i.%llu", static_cast<int>(pDataSource), pState.Id);
+	// ImGui::BeginChild(buffer, ImVec2(ImGui::GetWindowContentRegionWidth() * 0.35f, 0));
+	// ImGui::Text(u8"總治療量");
+	// ImGuiEx::TextRightAlignedSameLine("%llu", pState.Healing);
 
-	ImGui::Text(u8"命中數");
-	ImGuiEx::TextRightAlignedSameLine("%llu", pState.Hits);
+	// ImGui::Text(u8"命中數");
+	// ImGuiEx::TextRightAlignedSameLine("%llu", pState.Hits);
+
+	// if (pState.Casts.has_value() == true)
+	// {
+	// 	ImGui::Text(u8"施法數");
+	// 	ImGuiEx::TextRightAlignedSameLine("%llu", *pState.Casts);
+	// }
+
+	// ImGui::Text(u8"每秒治療量");
+	// ImGuiEx::TextRightAlignedSameLine("%.1f", divide_safe(pState.Healing, pState.TimeInCombat));
+
+	// ImGui::Text(u8"每次命中治療量");
+	// ImGuiEx::TextRightAlignedSameLine("%.1f", divide_safe(pState.Healing, pState.Hits));
+
+	// if (pState.Casts.has_value() == true)
+	// {
+	// 	ImGui::Text(u8"每次施法治療量");
+	// 	ImGuiEx::TextRightAlignedSameLine("%.1f", divide_safe(pState.Healing, *pState.Casts));
+	// }
+
+	// ImGuiEx::BottomText("ID %u", pState.Id);
+	snprintf(buffer, sizeof(buffer), "##HEALDETAILS.%u.TOTALS.%i.%llu", pContext.WindowId, static_cast<int>(pDataSource), pState.Id);
+	ImGui::BeginChild(buffer, ImVec2(pState.LastFrameLeftSideMinWidth, 0), false, ImGuiWindowFlags_NoScrollbar);
+
+	pState.LastFrameLeftSideMinWidth = 0;
+	// Make sure the right side is never truncated too far so the user understands that there is room for empty entries
+	pState.LastFrameRightSideMinWidth = 400;
+
+	uint64_t adjustedHealing = (pState.Healing - pState.BarrierGeneration);
+
+	if (adjustedHealing > 0 || pState.BarrierGeneration == 0)
+	{
+		pState.LastFrameLeftSideMinWidth = (std::max)(
+			pState.LastFrameLeftSideMinWidth,
+			ImGuiEx::DetailsSummaryEntry("total healing", "%llu", adjustedHealing));
+	}
+
+	if (pState.BarrierGeneration > 0)
+	{
+		pState.LastFrameLeftSideMinWidth = (std::max)(
+			pState.LastFrameLeftSideMinWidth,
+			ImGuiEx::DetailsSummaryEntry("total barrier gen", "%llu", pState.BarrierGeneration));
+	}
+
+	pState.LastFrameLeftSideMinWidth = (std::max)(
+		pState.LastFrameLeftSideMinWidth,
+		ImGuiEx::DetailsSummaryEntry("hits", "%llu", pState.Hits));
 
 	if (pState.Casts.has_value() == true)
 	{
-		ImGui::Text(u8"施法數");
-		ImGuiEx::TextRightAlignedSameLine("%llu", *pState.Casts);
+		pState.LastFrameLeftSideMinWidth = (std::max)(
+			pState.LastFrameLeftSideMinWidth,
+			ImGuiEx::DetailsSummaryEntry("casts", "%llu", *pState.Casts));
 	}
 
-	ImGui::Text(u8"每秒治療量");
-	ImGuiEx::TextRightAlignedSameLine("%.1f", divide_safe(pState.Healing, pState.TimeInCombat));
-
-	ImGui::Text(u8"每次命中治療量");
-	ImGuiEx::TextRightAlignedSameLine("%.1f", divide_safe(pState.Healing, pState.Hits));
-
-	if (pState.Casts.has_value() == true)
+	if (adjustedHealing > 0 || pState.BarrierGeneration == 0)
 	{
-		ImGui::Text(u8"每次施法治療量");
-		ImGuiEx::TextRightAlignedSameLine("%.1f", divide_safe(pState.Healing, *pState.Casts));
+		pState.LastFrameLeftSideMinWidth = (std::max)(
+			pState.LastFrameLeftSideMinWidth,
+			ImGuiEx::DetailsSummaryEntry("healing per second", "%.1f", divide_safe(adjustedHealing, pState.TimeInCombat)));
+		pState.LastFrameLeftSideMinWidth = (std::max)(
+			pState.LastFrameLeftSideMinWidth,
+			ImGuiEx::DetailsSummaryEntry("healing per hit", "%.1f", divide_safe(adjustedHealing, pState.Hits)));
+
+		if (pState.Casts.has_value() == true)
+		{
+			pState.LastFrameLeftSideMinWidth = (std::max)(
+				pState.LastFrameLeftSideMinWidth,
+				ImGuiEx::DetailsSummaryEntry("healing per cast", "%.1f", divide_safe(adjustedHealing, *pState.Casts)));
+		}
 	}
 
-	ImGuiEx::BottomText("ID %u", pState.Id);
+	if (pState.BarrierGeneration > 0)
+	{
+		pState.LastFrameLeftSideMinWidth = (std::max)(
+			pState.LastFrameLeftSideMinWidth,
+			ImGuiEx::DetailsSummaryEntry("barrier gen per second", "%.1f", divide_safe(pState.BarrierGeneration, pState.TimeInCombat)));
+		pState.LastFrameLeftSideMinWidth = (std::max)(
+			pState.LastFrameLeftSideMinWidth,
+			ImGuiEx::DetailsSummaryEntry("barrier gen per hit", "%.1f", divide_safe(pState.BarrierGeneration, pState.Hits)));
+
+		if (pState.Casts.has_value() == true)
+		{
+			pState.LastFrameLeftSideMinWidth = (std::max)(
+				pState.LastFrameLeftSideMinWidth,
+				ImGuiEx::DetailsSummaryEntry("barrier gen per cast", "%.1f", divide_safe(pState.BarrierGeneration, *pState.Casts)));
+		}
+	}
+
+	pState.LastFrameLeftSideMinWidth += ImGui::GetCurrentWindowRead()->ScrollbarSizes.x;
+
+	ImGuiEx::BottomText("id %u", pState.Id);
 	ImGui::EndChild();
 
-	snprintf(buffer, sizeof(buffer), "##HEALDETAILS.ENTRIES.%i.%llu", static_cast<int>(pDataSource), pState.Id);
+	snprintf(buffer, sizeof(buffer), "##HEALDETAILS.%u.ENTRIES.%i.%llu", pContext.WindowId, static_cast<int>(pDataSource), pState.Id);
 	ImGui::SameLine();
 	ImGui::BeginChild(buffer, ImVec2(0, 0));
 
 	const AggregatedVector& stats = pContext.CurrentAggregatedStats->GetDetails(pDataSource, pState.Id);
 	for (const auto& entry : stats.Entries)
 	{
+		// TODO: Add barrier generation here?
 		std::array<std::optional<std::variant<uint64_t, double>>, 7> entryValues{
 			entry.Healing,
 			entry.Hits,
@@ -105,18 +428,133 @@ static void Display_DetailsWindow(HealWindowContext& pContext, DetailsWindowStat
 			divide_safe(entry.Healing * 100, pState.Healing)};
 		ReplaceFormatted(buffer, sizeof(buffer), pContext.DetailsEntryFormat, entryValues);
 
-		float fillRatio = static_cast<float>(divide_safe(entry.Healing, stats.HighestHealing));
-		std::string_view name = entry.Name;
-		if (pContext.MaxNameLength > 0)
-		{
-			name = name.substr(0, pContext.MaxNameLength);
-		}
-		ImGuiEx::StatsEntry(name, buffer, pContext.ShowProgressBars == true ? std::optional{fillRatio} : std::nullopt);
+		float healingRatio = static_cast<float>(divide_safe(entry.Healing, stats.HighestHealing));
+		float barrierGenerationRatio = static_cast<float>(divide_safe(entry.BarrierGeneration, stats.HighestHealing));
+
+		std::string_view name = entry.Agent.Name;
+		pState.LastFrameRightSideMinWidth = (std::max)(
+			pState.LastFrameRightSideMinWidth,
+			ImGuiEx::StatsEntry(name, buffer, pContext.ShowProgressBars == true ? std::optional{healingRatio} : std::nullopt, pContext.ShowProgressBars == true ? std::optional{ barrierGenerationRatio } : std::nullopt, std::nullopt, std::nullopt, nullptr, std::nullopt, std::nullopt, std::nullopt, false));
 	}
+	
+	pState.LastFrameRightSideMinWidth += ImGui::GetCurrentWindowRead()->ScrollbarSizes.x;
+
 	ImGui::EndChild();
 
 	ImGui::PopStyleColor();
 	ImGui::End();
+}
+
+static void Display_ContentSingleRow(HealWindowContext& pContext, DataSource pDataSource, uint32_t pWindowIndex, const AggregatedStatsEntry& pEntry, const AggregatedStatsEntry& pAggregatedTotal, const AggregatedVector& pStats, size_t pIndexNumber, bool pTop, bool pAnonymousMode, char* pBuffer, size_t pBufferLength)
+{
+	std::array<std::optional<std::variant<uint64_t, double>>, 7> entryValues{
+			pEntry.Healing,
+			pEntry.Hits,
+			pEntry.Casts,
+			divide_safe(pEntry.Healing, pEntry.TimeInCombat),
+			divide_safe(pEntry.Healing, pEntry.Hits),
+			pEntry.Casts.has_value() == true ? std::optional{divide_safe(pEntry.Healing, *pEntry.Casts)} : std::nullopt,
+			pContext.DataSourceChoice != DataSource::Totals ? std::optional{divide_safe(pEntry.Healing * 100, pAggregatedTotal.Healing)} : std::nullopt };
+	ReplaceFormatted(pBuffer, pBufferLength, pContext.EntryFormat, entryValues);
+
+	float healingRatio = static_cast<float>(divide_safe(pEntry.Healing, pStats.HighestHealing));
+	float barrierGenerationRatio = static_cast<float>(divide_safe(pEntry.BarrierGeneration, pStats.HighestHealing));
+
+	// Anonymous mode is enabled only if the entry is not the self entry
+	const HealedAgent& agent = pAnonymousMode == true && pEntry.Id != pContext.SelfUniqueId ? AnonymousAgent : pEntry.Agent;
+	std::string_view name = agent.Name;
+	if (pContext.ReplacePlayerWithAccountName)
+	{
+		name = agent.AccountName;
+		// The account name starts with ':', skip it
+		if (name.empty() != true && name[0] == ':')
+		{
+			name = name.substr(1);
+		}
+	}
+	if (pContext.MaxNameLength > 0)
+	{
+		name = utf8_substr(name, pContext.MaxNameLength);
+	}
+	else if (pContext.MaxNameLength < 0)
+	{
+		name = "";
+	}
+
+	/* Conditions to show the row:
+	* - OR: pTop is set to true. This is used by "self on top" and called only with SelfUniqueId as entry
+	* - OR: "hide self from list" is false, in which case we don't need to filter out the self entry
+	* - OR: "hide self from list" is true but the entry is not the self entry
+	* - OR: There's only one entry, in which case it's most likely the self entry which is always shown
+	* AND: at least one of the conditions above must be true AND one of the conditions below must be true
+	* - OR: "self only" is false so we show all entries
+	* - OR: "self only" is true but the entry is the self entry
+	*/
+	if ((pTop || pContext.HideSelfFromList == false || pEntry.Id != pContext.SelfUniqueId || pStats.Entries.size() == 1)
+		&& (pContext.SelfOnly == false || pEntry.Id == pContext.SelfUniqueId))
+	{
+		float minSize = ImGuiEx::StatsEntry(name, pBuffer,
+			pContext.ShowProgressBars == true ? std::optional{ healingRatio } : std::nullopt,
+			pContext.ShowProgressBars == true ? std::optional{ barrierGenerationRatio } : std::nullopt,
+			pContext.IndexNumbers == true ? std::optional{ GetIndexNumberText(pIndexNumber, pTop, pContext.SelfOnly) } : std::nullopt,
+			pContext.ProfessionText == true ? std::optional{ GetProfessionText(agent.Profession, agent.Elite) } : std::nullopt,
+			pContext.ProfessionIcons == true ? GetProfessionIcon(agent.Profession, agent.Elite) : nullptr,
+			pContext.UseProfessionForNameColour == true ? std::optional{ GetProfessionColorBase(agent.Profession, 1.0f) } : pContext.UseSubgroupForNameColour ? std::optional{ GetSubgroupColorBase(agent.Subgroup, 1.0f) } : std::nullopt,
+			pContext.UseSubgroupForBarColour == true ? std::optional{ GetSubgroupColorBase(agent.Subgroup) } : pContext.UseProfessionForBarColour == true ? std::optional{ GetProfessionColorBase(agent.Profession) } : std::nullopt,
+			pContext.UseSubgroupForBarColour == true ? std::optional{ GetSubgroupColorHighlight(agent.Subgroup) } : pContext.UseProfessionForBarColour == true ? std::optional{ GetProfessionColorHighlight(agent.Profession) } : std::nullopt,
+			pContext.SelfUniqueId == pEntry.Id);
+
+		pContext.LastFrameMinWidth = (std::max)(pContext.LastFrameMinWidth, minSize);
+		pContext.CurrentFrameLineCount += 1;
+	}
+
+	DetailsWindowState* state = nullptr;
+	std::vector<DetailsWindowState>* vec;
+	switch (pDataSource)
+	{
+	case DataSource::Agents:
+		vec = &pContext.OpenAgentWindows;
+		break;
+	case DataSource::Skills:
+		vec = &pContext.OpenSkillWindows;
+		break;
+	case DataSource::PeersOutgoing:
+		vec = &pContext.OpenPeersOutgoingWindows;
+		break;
+	default:
+		vec = nullptr;
+		break;
+	}
+
+	if (vec != nullptr)
+	{
+		for (auto& iter : *vec)
+		{
+			if (iter.Id == pEntry.Id)
+			{
+				state = &(iter);
+				break;
+			}
+		}
+	}
+
+	// If it was opened in a previous frame, we need the update the statistics stored so they are up to date
+	if (state != nullptr)
+	{
+		*static_cast<AggregatedStatsEntry*>(state) = pEntry;
+	}
+
+	// Allow to toggle the details window only if "anonymous mode" is disabled or the entry is the self entry
+	if (vec != nullptr && ImGui::IsItemClicked() == true && (pContext.AnonymousMode == false || pEntry.Id == pContext.SelfUniqueId))
+	{
+		if (state == nullptr)
+		{
+			state = &vec->emplace_back(pEntry);
+		}
+		state->IsOpen = !state->IsOpen;
+
+		LOG("Toggled details window for entry %llu %s in window %u", pEntry.Id, pEntry.Agent.Name.c_str(), pWindowIndex);
+	}
 }
 
 static void Display_Content(HealWindowContext& pContext, DataSource pDataSource, uint32_t pWindowIndex, bool pEvtcRpcEnabled)
@@ -145,76 +583,27 @@ static void Display_Content(HealWindowContext& pContext, DataSource pDataSource,
 	const AggregatedStatsEntry& aggregatedTotal = pContext.CurrentAggregatedStats->GetTotal(pDataSource);
 
 	const AggregatedVector& stats = pContext.CurrentAggregatedStats->GetStats(pDataSource);
+
+	// "self on top" is enabled only if there are multiple entries
+	if (pContext.SelfOnTop && stats.Entries.size() > 1)
+	{
+		const auto selfEntry = std::find_if(stats.Entries.cbegin(), stats.Entries.cend(), [pSelfUniqueId = pContext.SelfUniqueId](const auto& pEntry) {
+			return pEntry.Id == pSelfUniqueId;
+		});
+
+		if (selfEntry != stats.Entries.cend())
+		{
+			Display_ContentSingleRow(pContext, pDataSource, pWindowIndex , *selfEntry, aggregatedTotal, stats, 0, true, false, buffer, sizeof(buffer));
+			ImGui::Separator();
+			pContext.CurrentFrameExtraHeight += 1.0f + ImGui::GetStyle().ItemSpacing.y;
+		}
+	}
+
 	for (size_t i = 0; i < stats.Entries.size(); i++)
 	{
 		const auto& entry = stats.Entries[i];
 
-		std::array<std::optional<std::variant<uint64_t, double>>, 7> entryValues{
-			entry.Healing,
-			entry.Hits,
-			entry.Casts,
-			divide_safe(entry.Healing, entry.TimeInCombat),
-			divide_safe(entry.Healing, entry.Hits),
-			entry.Casts.has_value() == true ? std::optional{divide_safe(entry.Healing, *entry.Casts)} : std::nullopt,
-			pContext.DataSourceChoice != DataSource::Totals ? std::optional{divide_safe(entry.Healing * 100, aggregatedTotal.Healing)} : std::nullopt };
-		ReplaceFormatted(buffer, sizeof(buffer), pContext.EntryFormat, entryValues);
-
-		float fillRatio = static_cast<float>(divide_safe(entry.Healing, stats.HighestHealing));
-		std::string_view name = entry.Name;
-		if (pContext.MaxNameLength > 0)
-		{
-			name = name.substr(0, pContext.MaxNameLength);
-		}
-		float minSize = ImGuiEx::StatsEntry(name, buffer, pContext.ShowProgressBars == true ? std::optional{fillRatio} : std::nullopt);
-		pContext.LastFrameMinWidth = (std::max)(pContext.LastFrameMinWidth, minSize);
-		pContext.CurrentFrameLineCount += 1;
-
-		DetailsWindowState* state = nullptr;
-		std::vector<DetailsWindowState>* vec;
-		switch (pDataSource)
-		{
-		case DataSource::Agents:
-			vec = &pContext.OpenAgentWindows;
-			break;
-		case DataSource::Skills:
-			vec = &pContext.OpenSkillWindows;
-			break;
-		case DataSource::PeersOutgoing:
-			vec = &pContext.OpenPeersOutgoingWindows;
-			break;
-		default:
-			vec = nullptr;
-			break;
-		}
-
-		if (vec != nullptr)
-		{
-			for (auto& iter : *vec)
-			{
-				if (iter.Id == entry.Id)
-				{
-					state = &(iter);
-					break;
-				}
-			}
-		}
-
-		// If it was opened in a previous frame, we need the update the statistics stored so they are up to date
-		if (state != nullptr)
-		{
-			*static_cast<AggregatedStatsEntry*>(state) = entry;
-		}
-
-		if (vec != nullptr && ImGui::IsItemClicked() == true)
-		{
-			if (state == nullptr)
-			{
-				state = &vec->emplace_back(entry);
-			}
-			state->IsOpen = !state->IsOpen;
-
-			LOG("Toggled details window for entry %llu %s in window %u", entry.Id, entry.Name.c_str(), pWindowIndex);
-		}
+		Display_ContentSingleRow(pContext, pDataSource, pWindowIndex, entry, aggregatedTotal, stats, i + 1, false, pContext.AnonymousMode, buffer, sizeof(buffer));
 	}
 }
 
@@ -318,21 +707,41 @@ static void Display_WindowOptions(HealTableOptions& pHealingOptions, HealWindowC
 		ImGuiEx::ComboMenu(u8"資料來源", pContext.DataSourceChoice, DATA_SOURCE_ITEMS);
 		ImGuiEx::AddTooltipToLastItem(u8"決定視窗中顯示哪些資料");
 
-		if (pContext.DataSourceChoice != DataSource::Totals)
 		{
-			ImGuiEx::ComboMenu(u8"排序", pContext.SortOrderChoice, SORT_ORDER_ITEMS);
-			ImGuiEx::AddTooltipToLastItem(u8"決定如何在\"目標\"和\"技能\"部分中對目標和技能進行排序。");
+			// ImGuiEx::ComboMenu(u8"排序", pContext.SortOrderChoice, SORT_ORDER_ITEMS);
+			// ImGuiEx::AddTooltipToLastItem(u8"決定如何在\"目標\"和\"技能\"部分中對目標和技能進行排序。");
 
-			if (ImGui::BeginMenu(u8"統計資料排除") == true)
+			// if (ImGui::BeginMenu(u8"統計資料排除") == true)
+			// {
+			// 	ImGuiEx::SmallCheckBox(u8"小隊", &pContext.ExcludeGroup);
+			// 	ImGuiEx::SmallCheckBox(u8"小隊外", &pContext.ExcludeOffGroup);
+			// 	ImGuiEx::SmallCheckBox(u8"團隊外", &pContext.ExcludeOffSquad);
+			// 	ImGuiEx::SmallCheckBox(u8"召喚物", &pContext.ExcludeMinions);
+			// 	ImGuiEx::SmallCheckBox(u8"其他", &pContext.ExcludeUnmapped);
+
+			// 	ImGui::EndMenu();
+			ImGuiEx::ScopedUninteractable uninteractableScope{pContext.DataSourceChoice == DataSource::Totals};
+
+			ImGuiEx::ComboMenu("sort order", pContext.SortOrderChoice, SORT_ORDER_ITEMS);
+			ImGuiEx::AddTooltipToLastItem("Decides how targets and skills are sorted in the 'Targets' and 'Skills' sections.");
+		}
+
+		if (ImGui::BeginMenu("stats exclude") == true)
+		{
 			{
-				ImGuiEx::SmallCheckBox(u8"小隊", &pContext.ExcludeGroup);
-				ImGuiEx::SmallCheckBox(u8"小隊外", &pContext.ExcludeOffGroup);
-				ImGuiEx::SmallCheckBox(u8"團隊外", &pContext.ExcludeOffSquad);
-				ImGuiEx::SmallCheckBox(u8"召喚物", &pContext.ExcludeMinions);
-				ImGuiEx::SmallCheckBox(u8"其他", &pContext.ExcludeUnmapped);
+				ImGuiEx::ScopedUninteractable uninteractableScope{pContext.DataSourceChoice == DataSource::Totals};
 
-				ImGui::EndMenu();
+				ImGuiEx::SmallCheckBox("group", &pContext.ExcludeGroup);
+				ImGuiEx::SmallCheckBox("off-group", &pContext.ExcludeOffGroup);
+				ImGuiEx::SmallCheckBox("off-squad", &pContext.ExcludeOffSquad);
+				ImGuiEx::SmallCheckBox("summons", &pContext.ExcludeMinions);
+				ImGuiEx::SmallCheckBox("unmapped", &pContext.ExcludeUnmapped);
 			}
+
+			ImGuiEx::SmallCheckBox("healing", &pContext.ExcludeHealing);
+			ImGuiEx::SmallCheckBox("barrier generation", &pContext.ExcludeBarrierGeneration);
+
+			ImGui::EndMenu();
 		}
 
 		ImGuiEx::ComboMenu(u8"戰鬥結束", pContext.CombatEndConditionChoice, COMBAT_END_CONDITION_ITEMS);
@@ -347,6 +756,50 @@ static void Display_WindowOptions(HealTableOptions& pHealingOptions, HealWindowC
 			ImGuiEx::SmallCheckBox(u8"顯示條形圖", &pContext.ShowProgressBars);
 			ImGuiEx::AddTooltipToLastItem(u8"在每個條目下方顯示一個有色條，表示該條目與最大條目的比例");
 
+			if (ImGuiEx::SmallCheckBox("use subgroup for bar colour", &pContext.UseSubgroupForBarColour) == true && pContext.UseSubgroupForBarColour == true)
+			{
+				// Mutually exclusive with "use profession for bar colour"
+				pContext.UseProfessionForBarColour = false;
+			}
+			if (ImGuiEx::SmallCheckBox("use profession for bar colour", &pContext.UseProfessionForBarColour) == true && pContext.UseProfessionForBarColour == true)
+			{
+				// Mutually exclusive with "use subgroup for bar colour"
+				pContext.UseSubgroupForBarColour = false;
+			}
+			ImGuiEx::SmallCheckBox("index numbers", &pContext.IndexNumbers);
+			ImGuiEx::SmallCheckBox("profession text", &pContext.ProfessionText);
+			ImGuiEx::SmallCheckBox("profession icons", &pContext.ProfessionIcons);
+			ImGuiEx::SmallCheckBox("replace player with account name", &pContext.ReplacePlayerWithAccountName);
+			if (ImGuiEx::SmallCheckBox("use profession for name colour", &pContext.UseProfessionForNameColour) == true && pContext.UseProfessionForNameColour == true)
+			{
+				// Mutually exclusive with "use subgroup for name colour"
+				pContext.UseSubgroupForNameColour = false;
+			}
+			if (ImGuiEx::SmallCheckBox("use subgroup for name colour", &pContext.UseSubgroupForNameColour) == true && pContext.UseSubgroupForNameColour == true)
+			{
+				// Mutually exclusive with "use profession for name colour"
+				pContext.UseProfessionForNameColour = false;
+			}
+			if (ImGuiEx::SmallCheckBox("self on top", &pContext.SelfOnTop) == true && pContext.SelfOnTop == true)
+			{
+				// Mutually exclusive with "self only"
+				pContext.SelfOnly = false;
+				// Reset "hide self from list" every time "self on top" is enabled
+				pContext.HideSelfFromList = false;
+			}
+			if (pContext.SelfOnTop == true)
+			{
+				// Show "hide self from list" only when "self on top" is enabled
+				ImGuiEx::SmallCheckBox("hide self from list", &pContext.HideSelfFromList);
+			}
+			if (ImGuiEx::SmallCheckBox("self only", &pContext.SelfOnly) == true && pContext.SelfOnly == true)
+			{
+				// Mutually exclusive with "self on top" and "hide self from list"
+				pContext.SelfOnTop = false;
+				pContext.HideSelfFromList = false;
+			}
+			ImGuiEx::SmallCheckBox("anonymous mode", &pContext.AnonymousMode);
+
 			ImGui::SetNextItemWidth(260.0f);
 			ImGuiEx::SmallInputText(u8"簡稱", pContext.Name, sizeof(pContext.Name));
 			ImGuiEx::AddTooltipToLastItem(u8"用於在\"治療統計\"選單中表示此視窗的名稱");
@@ -354,7 +807,8 @@ static void Display_WindowOptions(HealTableOptions& pHealingOptions, HealWindowC
 			ImGui::SetNextItemWidth(39.0f);
 			ImGuiEx::SmallInputInt(u8"最大名字長度", &pContext.MaxNameLength);
 			ImGuiEx::AddTooltipToLastItem(
-				u8"將顯示的名稱截斷為所設定長度的字串。 設定為 0 以停用。");
+				// u8"將顯示的名稱截斷為所設定長度的字串。 設定為 0 以停用。");
+				"Truncate displayed names to this many characters. Set to 0 to disable, -1 to hide");
 
 			ImGui::SetNextItemWidth(39.0f);
 			ImGuiEx::SmallInputInt(u8"最小顯示行數", &pContext.MinLinesDisplayed);
@@ -420,24 +874,32 @@ static void Display_WindowOptions(HealTableOptions& pHealingOptions, HealWindowC
 			
 			ImGui::Separator();
 
-			ImGuiEx::SmallCheckBox(u8"自動調整視窗大小", &pContext.AutoResize);
-			if (pContext.AutoResize == false)
-			{
-				ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(128, 128, 128, 255));
-			}
-			ImGuiEx::SmallIndent();
+			// ImGuiEx::SmallCheckBox(u8"自動調整視窗大小", &pContext.AutoResize);
+			// if (pContext.AutoResize == false)
+			// {
+			// 	ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+			// 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(128, 128, 128, 255));
+			// }
+			// ImGuiEx::SmallIndent();
 
-			ImGui::SetNextItemWidth(65.0f);
-			ImGuiEx::SmallInputInt(u8"視窗寬度", &pContext.FixedWindowWidth);
-			ImGuiEx::AddTooltipToLastItem(
-				u8"設定為 0 以動態調整寬度大小");
+			// ImGui::SetNextItemWidth(65.0f);
+			// ImGuiEx::SmallInputInt(u8"視窗寬度", &pContext.FixedWindowWidth);
+			// ImGuiEx::AddTooltipToLastItem(
+			// 	u8"設定為 0 以動態調整寬度大小");
 
-			ImGuiEx::SmallUnindent();
-			if (pContext.AutoResize == false)
+			// ImGuiEx::SmallUnindent();
+			// if (pContext.AutoResize == false)
+			ImGuiEx::SmallCheckBox("auto resize window", &pContext.AutoResize);
+
 			{
-				ImGui::PopItemFlag();
-				ImGui::PopStyleColor();
+				ImGuiEx::ScopedUninteractable uninteractableScope{pContext.AutoResize == false};
+
+				ImGuiEx::SmallIndent();
+				ImGui::SetNextItemWidth(65.0f);
+				ImGuiEx::SmallInputInt("window width", &pContext.FixedWindowWidth);
+				ImGuiEx::AddTooltipToLastItem(
+					"Set to 0 for dynamic resizing of width");
+				ImGuiEx::SmallUnindent();
 			}
 
 			ImGui::EndMenu();
@@ -500,6 +962,7 @@ void Display_GUI(HealTableOptions& pHealingOptions)
 			auto [localId, states] = GlobalObjects::EVENT_PROCESSOR->GetState();
 			curWindow.CurrentAggregatedStats = std::make_unique<AggregatedStatsCollection>(std::move(states), localId, curWindow, pHealingOptions.DebugMode);
 			curWindow.LastAggregatedTime = curTime;
+			curWindow.SelfUniqueId = localId;
 		}
 
 		float timeInCombat = curWindow.CurrentAggregatedStats->GetCombatTime();
@@ -507,6 +970,7 @@ void Display_GUI(HealTableOptions& pHealingOptions)
 
 		if (curWindow.DataSourceChoice != DataSource::Totals)
 		{
+			// TODO: Add barrier generation here?
 			std::array<std::optional<std::variant<uint64_t, double>>, 7> titleValues{
 				aggregatedTotal.Healing,
 				aggregatedTotal.Hits,
@@ -531,6 +995,15 @@ void Display_GUI(HealTableOptions& pHealingOptions)
 			(curWindow.PositionRule != Position::WindowRelative || curWindow.AnchorWindowId != 0))
 		{
 			window_flags |= ImGuiWindowFlags_NoMove;
+		}
+
+		if (curWindow.AutoResize == true)
+		{
+			window_flags |= ImGuiWindowFlags_NoResize;
+		}
+		else
+		{
+			window_flags &= ~ImGuiWindowFlags_NoResize;
 		}
 
 		ImGui::SetNextWindowSize(ImVec2(400, 600), ImGuiCond_FirstUseEver);
@@ -561,6 +1034,7 @@ void Display_GUI(HealTableOptions& pHealingOptions)
 
 		curWindow.LastFrameMinWidth = 0;
 		curWindow.CurrentFrameLineCount = 0;
+		curWindow.CurrentFrameExtraHeight = 0.0f;
 
 		curWindow.WindowId = ImGui::GetCurrentWindow()->ID;
 
@@ -633,7 +1107,7 @@ void Display_GUI(HealTableOptions& pHealingOptions)
 			size_t lineCount = (std::max)(curWindow.CurrentFrameLineCount, curWindow.MinLinesDisplayed);
 			lineCount = (std::min)(lineCount, curWindow.MaxLinesDisplayed);
 			
-			size.y = ImGuiEx::CalcWindowHeight(lineCount);
+			size.y = ImGuiEx::CalcWindowHeight(lineCount, curWindow.CurrentFrameExtraHeight);
 
 			LogT("lineCount={} CurrentFrameLineCount={} MinLinesDisplayed={} MaxLinesDisplayed={} y={}",
 				lineCount, curWindow.CurrentFrameLineCount, curWindow.MinLinesDisplayed, curWindow.MaxLinesDisplayed, size.y);
@@ -650,7 +1124,13 @@ static void Display_EvtcRpcStatus(const HealTableOptions& pHealingOptions)
 	if (status.Connected == true)
 	{
 		uint64_t seconds = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - status.ConnectTime).count();
-		ImGui::TextColored(ImVec4(0.0f, 0.75f, 0.0f, 1.0f), u8"已連線到 %s %llu 秒", status.Endpoint.c_str(), seconds);
+		// ImGui::TextColored(ImVec4(0.0f, 0.75f, 0.0f, 1.0f), u8"已連線到 %s %llu 秒", status.Endpoint.c_str(), seconds);
+		const char* encryptString = "with";
+		if (status.Encrypted == false)
+		{
+			encryptString = "without";
+		}
+		ImGui::TextColored(ImVec4(0.0f, 0.75f, 0.0f, 1.0f), "Connected to %s for %llu seconds %s encryption", status.Endpoint.c_str(), seconds, encryptString);
 	}
 	else if (pHealingOptions.EvtcRpcEnabled == false)
 	{
@@ -723,29 +1203,54 @@ void Display_AddonOptions(HealTableOptions& pHealingOptions)
 		u8"使用量就會增加，而上傳連線使用量則不會。"
 		, DATA_SOURCE_ITEMS[DataSource::PeersOutgoing]);
 
-	if (pHealingOptions.EvtcRpcEnabled == false)
 	{
-		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(128, 128, 128, 255));
+		ImGuiEx::ScopedUninteractable uninteractableScope{pHealingOptions.EvtcRpcEnabled == false};
+
+		if (ImGuiEx::SmallCheckBox("live stats sharing - budget mode", &pHealingOptions.EvtcRpcBudgetMode) == true)
+		{
+			GlobalObjects::EVTC_RPC_CLIENT->SetBudgetMode(pHealingOptions.EvtcRpcBudgetMode);
+		}
+		ImGuiEx::AddTooltipToLastItem(
+			"Only send a minimal subset of events to peers. This reduces\n"
+			"the amount of upload bandwidth used by the addon. Healing\n"
+			"statistics shown will still be fully accurate, however combat\n"
+			"times as viewed by other players may be slightly inaccurate\n"
+			"while still in combat. If those players are running a version\n"
+			"of the addon released before budget mode support was\n"
+			"introduced, the combat times may be highly inaccurate, even\n"
+			"when out of combat. This option has no effect on download\n"
+			"bandwidth usage, only upload. Expected connection usage with\n"
+			"this option enabled should go down to <1kiB/s up.");
+
+		if (ImGuiEx::SmallCheckBox("live stats sharing - disable encryption", &pHealingOptions.EvtcRpcDisableEncryption) == true)
+		{
+			GlobalObjects::EVTC_RPC_CLIENT->SetDisableEncryption(pHealingOptions.EvtcRpcDisableEncryption);
+		}
+		ImGuiEx::AddTooltipToLastItem(
+			"By default, all messages sent to and from the live stats\n"
+			"sharing server are encrypted using TLS. This option disables\n"
+			"the encryption, which can be useful to work around certain\n"
+			"security applications, as well as to reduce the CPU usage of\n"
+			"live stats sharing");
 	}
-	if (ImGuiEx::SmallCheckBox(u8"即時統計資料共享 節省模式", &pHealingOptions.EvtcRpcBudgetMode) == true)
-	{
-		GlobalObjects::EVTC_RPC_CLIENT->SetBudgetMode(pHealingOptions.EvtcRpcBudgetMode);
-	}
-	if (pHealingOptions.EvtcRpcEnabled == false)
-	{
-		ImGui::PopItemFlag();
-		ImGui::PopStyleColor();
-	}
-	ImGuiEx::AddTooltipToLastItem(
-		u8"只向團員發送事件的最小子集。 這減少了此插件\n"
-		u8"使用的上傳頻寬量。 顯示的治療統計資料仍然完全\n"
-		u8"準確，但是其他玩家在戰鬥中看到的戰鬥時間可能\n"
-		u8"會稍微不準確。 如果這些玩家使用的是在引入節省\n"
-		u8"模式支援之前發布的插件版本，則即使在非戰鬥狀態下\n"
-		u8"，戰鬥時間也可能非常不準確。 此選項對下載頻寬\n"
-		u8"使用量沒有影響，只影響上傳。 啟用此選項後，\n"
-		u8"預期連線使用量應降於 < 1 kiB/s 上傳。");
+	// if (ImGuiEx::SmallCheckBox(u8"即時統計資料共享 節省模式", &pHealingOptions.EvtcRpcBudgetMode) == true)
+	// {
+	// 	GlobalObjects::EVTC_RPC_CLIENT->SetBudgetMode(pHealingOptions.EvtcRpcBudgetMode);
+	// }
+	// if (pHealingOptions.EvtcRpcEnabled == false)
+	// {
+	// 	ImGui::PopItemFlag();
+	// 	ImGui::PopStyleColor();
+	// }
+	// ImGuiEx::AddTooltipToLastItem(
+	// 	u8"只向團員發送事件的最小子集。 這減少了此插件\n"
+	// 	u8"使用的上傳頻寬量。 顯示的治療統計資料仍然完全\n"
+	// 	u8"準確，但是其他玩家在戰鬥中看到的戰鬥時間可能\n"
+	// 	u8"會稍微不準確。 如果這些玩家使用的是在引入節省\n"
+	// 	u8"模式支援之前發布的插件版本，則即使在非戰鬥狀態下\n"
+	// 	u8"，戰鬥時間也可能非常不準確。 此選項對下載頻寬\n"
+	// 	u8"使用量沒有影響，只影響上傳。 啟用此選項後，\n"
+	// 	u8"預期連線使用量應降於 < 1 kiB/s 上傳。");
 
 	float oldPosY = ImGui::GetCursorPosY();
 	ImGui::BeginGroup();
@@ -909,18 +1414,16 @@ void Display_PreEndFrame(ImGuiContext* pImguiContext, HealTableOptions& pHealing
 
 void ImGui_ProcessKeyEvent(HWND /*pWindowHandle*/, UINT pMessage, WPARAM pAdditionalW, LPARAM /*pAdditionalL*/)
 {
-	ImGuiIO& io = ImGui::GetIO();
-
 	switch (pMessage)
 	{
 	case WM_KEYUP:
 	case WM_SYSKEYUP: // WM_SYSKEYUP is called when a key is pressed with the ALT held down
-		io.KeysDown[static_cast<int>(pAdditionalW)] = false;
+		KeysDown::SetKeyDown(static_cast<int>(pAdditionalW), false);
 		break;
 
 	case WM_KEYDOWN:
 	case WM_SYSKEYDOWN: // WM_SYSKEYDOWN is called when a key is pressed with the ALT held down
-		io.KeysDown[static_cast<int>(pAdditionalW)] = true;
+		KeysDown::SetKeyDown(static_cast<int>(pAdditionalW), true);
 		break;
 
 	default:

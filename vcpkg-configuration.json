@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg-configuration.schema.json",
+  "default-registry": {
+    "kind": "git",
+    "repository": "https://github.com/microsoft/vcpkg",
+    "baseline": "afcc8a3cdfb9bec4e62dc32b23f976e2c56b046f"
+  },
+  "registries": [
+    {
+      "kind": "git",
+      "repository": "https://github.com/Zinn-o-Matics/vcpkg-registry",
+      "baseline": "3fcc46e22d760e898588cc09970adea63cd3fbd1",
+      "packages": [ "arcdps-extension", "arcdps-mock", "arcdps-unofficial-extras", "imgui" ]
+    }
+  ]
+}

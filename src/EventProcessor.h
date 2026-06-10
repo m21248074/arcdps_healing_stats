@@ -1,8 +1,9 @@
 #pragma once
-#include "arcdps_structs.h"
 #include "AgentTable.h"
 #include "PlayerStats.h"
 #include "Skills.h"
+
+#include <ArcdpsExtension/arcdps_structs.h>
 
 #include <optional>
 
@@ -27,7 +28,7 @@ public:
 
 	// Returns <local unique id, map<unique id, <name, agent state>>
 	// pSelfUniqueId is only specified in testing
-	std::pair<uintptr_t, std::map<uintptr_t, std::pair<std::string, HealingStats>>> GetState(uintptr_t pSelfUniqueId = 0);
+	std::pair<uintptr_t, std::map<uintptr_t, std::pair<HealedAgent, HealingStats>>> GetState(uintptr_t pSelfUniqueId = 0);
 
 #ifndef TEST
 private:

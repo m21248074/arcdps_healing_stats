@@ -1,9 +1,8 @@
 #pragma once
 #include "Utilities.h"
 
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include "imgui.h"
-#include "imgui_internal.h"
+#include <imgui/imgui.h>
+#include <imgui/imgui_internal.h>
 
 #include <optional>
 #include <string_view>
@@ -32,7 +31,34 @@ namespace ImGuiEx
 		}
 	};
 
-	float CalcWindowHeight(size_t pLineCount, ImGuiWindow* pWindow = nullptr);
+	class ScopedUninteractable
+	{
+	public:
+		ScopedUninteractable(bool pIf)
+			: mEnabled(pIf)
+		{
+			if (mEnabled == true)
+			{
+				ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(128, 128, 128, 255));
+			}
+		}
+		
+		~ScopedUninteractable()
+		{
+			if (mEnabled == true)
+			{
+				ImGui::PopItemFlag();
+				ImGui::PopStyleColor();
+			}
+		}
+
+	private:
+		const bool mEnabled;
+	};
+	
+
+	float CalcWindowHeight(size_t pLineCount, float pExtraHeight, ImGuiWindow* pWindow = nullptr);
 
 	bool SmallCheckBox(const char* pLabel, bool* pIsPressed);
 	bool SmallInputFloat(const char* pLabel, float* pFloat);
@@ -43,7 +69,7 @@ namespace ImGuiEx
 	void SmallUnindent();
 
 	// returns minimum size needed to display the entry
-	float StatsEntry(std::string_view pLeftText, std::string_view pRightText, std::optional<float> pFillRatio);
+	float StatsEntry(std::string_view pLeftText, std::string_view pRightText, std::optional<float> pFillRatio, std::optional<float> pBarrierGenerationRatio, std::optional<std::string_view> pIndexNumber, std::optional<std::string> pProfessionText, void* pProfessionIcon, std::optional<ImVec4> pLeftTextColour, std::optional<ImVec4> pHealColour, std::optional<ImVec4> pBarrierGenerationColour, bool pSelf);
 
 	template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
 	bool SmallInputInt(const char* pLabel, T* pInt)
@@ -72,14 +98,29 @@ namespace ImGuiEx
 	}
 
 	template <typename... Args>
-	void TextRightAlignedSameLine(const char* pFormatString, Args... pArgs)
+	float TextRightAlignedSameLine(const char* pFormatString, Args... pArgs)
 	{
 		char buffer[1024];
 
 		snprintf(buffer, sizeof(buffer), pFormatString, pArgs...);
+		float textSize = ImGui::CalcTextSize(buffer).x;
+
 		ImGui::SameLine();
-		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(buffer).x); // Sending x in SameLine messes with alignment when inside of a group
+		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - textSize); // Sending x in SameLine messes with alignment when inside of a group
 		ImGui::Text("%s", buffer);
+
+		return textSize;
+	}
+
+	template <typename... Args>
+	float DetailsSummaryEntry(const char* pCategoryName, const char* pFormatString, Args... pArgs)
+	{
+		float leftTextSize = ImGui::CalcTextSize(pCategoryName).x;
+		ImGui::Text(pCategoryName);
+
+		float rightTextSize = TextRightAlignedSameLine(pFormatString, pArgs...);
+		// Two item spacings between the left and right text, and WindowPadding on each side of the left and right text.
+		return leftTextSize + ImGui::GetStyle().ItemSpacing.x * 2.0f + ImGui::GetCurrentWindowRead()->WindowPadding.x * 2.0f + rightTextSize;
 	}
 
 	template <typename... Args>
@@ -91,6 +132,8 @@ namespace ImGuiEx
 		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x * 0.5f - ImGui::CalcTextSize(buffer).x * 0.5f);
 		ImGui::TextColored(pColor, "%s", buffer);
 	}
+
+	void TextColoredUnformatted(std::optional<ImU32> pColor, std::string_view pText);
 
 	template <typename... Args>
 	void BottomText(const char* pFormatString, Args... pArgs)

@@ -1,14 +1,16 @@
 #include "AddonVersion.h"
-#include "arcdps_structs.h"
 #include "Exports.h"
 #include "GUI.h"
+#include "KeysDown.h"
 #include "Log.h"
 #include "PlayerStats.h"
 #include "Utilities.h"
 
-#include "imgui.h"
-#include "imgui_internal.h"
+#include <imgui/imgui.h>
+#include <imgui/imgui_internal.h>
 #include "../resource.h"
+
+#include <ArcdpsExtension/arcdps_structs.h>
 
 #include <atomic>
 
@@ -19,19 +21,20 @@
 #include <stdio.h>
 #include <Windows.h>
 
+#include <ares_version.h>
 #include <grpcpp/grpcpp.h>
 #include <cpr/cpr.h>
 
 /* proto/globals */
 arcdps_exports* mod_init();
 uintptr_t mod_release();
-uintptr_t mod_imgui(uint32_t pNotCharSelectionOrLoading, uint32_t pHideIfCombatOrOoc);
-uintptr_t mod_options_end();
-uintptr_t mod_combat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision);
-uintptr_t mod_combat_local(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision);
-uintptr_t mod_wnd(HWND pWindowHandle, UINT pMessage, WPARAM pAdditionalW, LPARAM pAdditionalL);
+void mod_imgui(uint32_t pNotCharSelectionOrLoading, uint32_t pHideIfCombatOrOoc);
+void mod_options_end();
+void mod_combat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision);
+void mod_combat_local(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision);
+UINT mod_wnd(HWND pWindowHandle, UINT pMessage, WPARAM pAdditionalW, LPARAM pAdditionalL);
 
-uintptr_t ProcessLocalEvent(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision);
+void ProcessLocalEvent(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision);
 void ProcessPeerEvent(cbtevent* pEvent, uint16_t pPeerInstanceId);
 
 void Hook_PostNewFrame(ImGuiContext* pImguiContext, ImGuiContextHook*);
@@ -129,10 +132,12 @@ static void FreeWrapper(void* pPointer, void* /*pUserData*/)
 }
 
 /* export -- arcdps looks for this exported function and calls the address it returns on client load */
-extern "C" __declspec(dllexport) ModInitSignature get_init_addr(const char* pArcdpsVersionString, void* pImguiContext, void*, HMODULE pArcModule , MallocSignature pArcdpsMalloc, FreeSignature pArcdpsFree)
+extern "C" __declspec(dllexport) ModInitSignature get_init_addr(const char* pArcdpsVersionString, void* pImguiContext, void* pID3DPtr, HMODULE pArcModule , MallocSignature pArcdpsMalloc, FreeSignature pArcdpsFree, uint32_t pImGuiVersion)
 {
 	GlobalObjects::ARC_E3 = reinterpret_cast<E3Signature>(GetProcAddress(pArcModule, "e3"));
 	assert(GlobalObjects::ARC_E3 != nullptr);
+	GlobalObjects::ARC_E5 = reinterpret_cast<E5Signature>(GetProcAddress(pArcModule, "e5"));
+	assert(GlobalObjects::ARC_E5 != nullptr);
 	GlobalObjects::ARC_E7 = reinterpret_cast<E7Signature>(GetProcAddress(pArcModule, "e7"));
 	assert(GlobalObjects::ARC_E7 != nullptr);
 	GlobalObjects::ARC_E9 = reinterpret_cast<E9Signature>(GetProcAddress(pArcModule, "e9"));
@@ -158,6 +163,8 @@ extern "C" __declspec(dllexport) ModInitSignature get_init_addr(const char* pArc
 		contextHook.Callback = Hook_PreEndFrame;
 		ImGui::AddContextHook(reinterpret_cast<ImGuiContext*>(pImguiContext), &contextHook);
 	}
+
+	LoadIcons(GlobalObjects::SELF_HANDLE, pID3DPtr, pImGuiVersion);
 
 	return mod_init;
 }
@@ -195,16 +202,16 @@ arcdps_exports* mod_init()
 	ARC_EXPORTS.out_name = "healing_stats";
 	ARC_EXPORTS.out_build = &GlobalObjects::VERSION_STRING_FRIENDLY[0];
 	ARC_EXPORTS.combat = mod_combat;
-	ARC_EXPORTS.imgui = reinterpret_cast<ImguiCallbackSignature>(mod_imgui); // TODO: Remove cast when arcdps_extension is updated
+	ARC_EXPORTS.imgui = mod_imgui;
 	ARC_EXPORTS.options_end = mod_options_end;
 	ARC_EXPORTS.combat_local = mod_combat_local;
 	ARC_EXPORTS.wnd_nofilter = mod_wnd;
 
 	GlobalObjects::UPDATE_CHECKER = std::make_unique<UpdateChecker>();
-	const std::optional<UpdateChecker::Version> version_raw = GlobalObjects::UPDATE_CHECKER->GetCurrentVersion(GlobalObjects::SELF_HANDLE);
+	const auto version_raw = GlobalObjects::UPDATE_CHECKER->GetCurrentVersion(GlobalObjects::SELF_HANDLE);
 	if (version_raw.has_value() == false)
 	{
-		LogE("Failed startup - GetCurrentVersion failed");
+		LogE("Failed startup - GetCurrentVersion failed - {}", version_raw.error());
 
 		ARC_EXPORTS.sig = 0;
 		ARC_EXPORTS.size = reinterpret_cast<uintptr_t>("GetCurrentVersion failed");
@@ -241,17 +248,26 @@ arcdps_exports* mod_init()
 			return std::string{GlobalObjects::ROOT_CERTIFICATES};
 		}; 
 
-	GlobalObjects::EVENT_SEQUENCER = std::make_unique<EventSequencer>(ProcessLocalEvent);
-	GlobalObjects::EVENT_PROCESSOR = std::make_unique<EventProcessor>();
-	GlobalObjects::EVTC_RPC_CLIENT = std::make_unique<evtc_rpc_client>(std::move(getEndpoint), std::move(getCertificates), std::function{ProcessPeerEvent});
-
 	{
 		std::lock_guard lock(HEAL_TABLE_OPTIONS_MUTEX);
 		HEAL_TABLE_OPTIONS.Load(JSON_CONFIG_PATH);
 
 		Log_::SetLevel(HEAL_TABLE_OPTIONS.LogLevel);
+		
+		if (HEAL_TABLE_OPTIONS.GrpcDnsResolverCAres == false)
+		{
+			BOOL res = SetEnvironmentVariableA("GRPC_DNS_RESOLVER", "native");
+			LogI("Set GRPC_DNS_RESOLVER to \"native\" (result {})", res);
+		}
+
+		GlobalObjects::EVENT_SEQUENCER = std::make_unique<EventSequencer>(ProcessLocalEvent);
+		GlobalObjects::EVENT_PROCESSOR = std::make_unique<EventProcessor>();
+		GlobalObjects::EVTC_RPC_CLIENT = std::make_unique<evtc_rpc_client>(std::move(getEndpoint), std::move(getCertificates), std::function{ProcessPeerEvent});
+
 		GlobalObjects::EVENT_PROCESSOR->SetEvtcLoggingEnabled(HEAL_TABLE_OPTIONS.EvtcLoggingEnabled);
 		GlobalObjects::EVTC_RPC_CLIENT->SetEnabledStatus(HEAL_TABLE_OPTIONS.EvtcRpcEnabled);
+		GlobalObjects::EVTC_RPC_CLIENT->SetBudgetMode(HEAL_TABLE_OPTIONS.EvtcRpcBudgetMode);
+		GlobalObjects::EVTC_RPC_CLIENT->SetDisableEncryption(HEAL_TABLE_OPTIONS.EvtcRpcDisableEncryption);
 
 		if (HEAL_TABLE_OPTIONS.AutoUpdateSetting != AutoUpdateSettingEnum::Off)
 		{
@@ -261,10 +277,12 @@ arcdps_exports* mod_init()
 		}
 	}
 
+	GlobalObjects::ARC_E5(GlobalObjects::COLORS);
+
 	GlobalObjects::EVTC_RPC_CLIENT_THREAD = std::make_unique<std::thread>(evtc_rpc_client::ThreadStartServe, GlobalObjects::EVTC_RPC_CLIENT.get());
 
-	LogI("Startup completed, arcdps_version={} healing_stats_version={} cpr_version={} curl_version={} grpc_version={} grpc_core_version={}",
-		ARCDPS_VERSION, ARC_EXPORTS.out_build, CPR_VERSION, LIBCURL_VERSION, grpc::Version(), grpc_version_string());
+	LogI("Startup completed, arcdps_version={} healing_stats_version={} cpr_version={} curl_version={} grpc_version={} grpc_core_version={} c-ares_version={}",
+		ARCDPS_VERSION, ARC_EXPORTS.out_build, CPR_VERSION, LIBCURL_VERSION, grpc::Version(), grpc_version_string(), ARES_VERSION_STR);
 	return &ARC_EXPORTS;
 }
 
@@ -319,18 +337,18 @@ uintptr_t mod_release()
 	return 0;
 }
 
-uintptr_t mod_imgui(uint32_t pNotCharSelectionOrLoading, uint32_t pHideIfCombatOrOoc)
+void mod_imgui(uint32_t pNotCharSelectionOrLoading, uint32_t pHideIfCombatOrOoc)
 {
 	std::shared_lock shutdown_lock(GlobalObjects::SHUTDOWN_LOCK);
 	if (GlobalObjects::IS_SHUTDOWN == true)
 	{
 		DEBUGLOG("already shutdown");
-		return 1;
+		return;
 	}
 
 	if (pNotCharSelectionOrLoading == 0 || pHideIfCombatOrOoc != 0)
 	{
-		return 0;
+		return;
 	}
 
 	{
@@ -339,17 +357,15 @@ uintptr_t mod_imgui(uint32_t pNotCharSelectionOrLoading, uint32_t pHideIfCombatO
 		Display_UpdateWindow();
 		Display_GUI(HEAL_TABLE_OPTIONS);
 	}
-
-	return 0;
 }
 
-uintptr_t mod_options_end()
+void mod_options_end()
 {
 	std::shared_lock shutdown_lock(GlobalObjects::SHUTDOWN_LOCK);
 	if (GlobalObjects::IS_SHUTDOWN == true)
 	{
 		DEBUGLOG("already shutdown");
-		return 1;
+		return;
 	}
 
 	{
@@ -357,41 +373,41 @@ uintptr_t mod_options_end()
 		Display_AddonOptions(HEAL_TABLE_OPTIONS);
 	}
 
-	return 0;
+	return;
 }
 
 /* combat callback -- may be called asynchronously. return ignored */
 /* one participant will be party/squad, or minion of. no spawn statechange events. despawn statechange only on marked boss npcs */
-uintptr_t mod_combat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision)
+void mod_combat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision)
 {
 	std::shared_lock shutdown_lock(GlobalObjects::SHUTDOWN_LOCK);
 	if (GlobalObjects::IS_SHUTDOWN == true)
 	{
 		DEBUGLOG("already shutdown");
-		return 1;
+		return;
 	}
 
 	GlobalObjects::EVENT_PROCESSOR->AreaCombat(pEvent, pSourceAgent, pDestinationAgent, pSkillname, pId, pRevision);
 	GlobalObjects::EVTC_RPC_CLIENT->ProcessAreaEvent(pEvent, pSourceAgent, pDestinationAgent, pSkillname, pId, pRevision);
-	return 0;
+	return;
 }
 
 /* combat callback -- may be called asynchronously. return ignored */
 /* one participant will be party/squad, or minion of. no spawn statechange events. despawn statechange only on marked boss npcs */
-uintptr_t mod_combat_local(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision)
+void mod_combat_local(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision)
 {
 	std::shared_lock shutdown_lock(GlobalObjects::SHUTDOWN_LOCK);
 	if (GlobalObjects::IS_SHUTDOWN == true)
 	{
 		DEBUGLOG("already shutdown");
-		return 1;
+		return;
 	}
 
 	GlobalObjects::EVENT_SEQUENCER->ProcessEvent(pEvent, pSourceAgent, pDestinationAgent, pSkillname, pId, pRevision);
-	return 0;
+	return;
 }
 
-uintptr_t ProcessLocalEvent(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision)
+void ProcessLocalEvent(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision)
 {
 	std::optional<cbtevent> modifiedEvent = std::nullopt;
 	GlobalObjects::EVENT_PROCESSOR->LocalCombat(pEvent, pSourceAgent, pDestinationAgent, pSkillname, pId, pRevision, &modifiedEvent);
@@ -401,7 +417,6 @@ uintptr_t ProcessLocalEvent(cbtevent* pEvent, ag* pSourceAgent, ag* pDestination
 	}
 
 	GlobalObjects::EVTC_RPC_CLIENT->ProcessLocalEvent(pEvent, pSourceAgent, pDestinationAgent, pSkillname, pId, pRevision);
-	return 0;
 }
 
 void ProcessPeerEvent(cbtevent* pEvent, uint16_t pPeerInstanceId)
@@ -421,7 +436,7 @@ struct ArcModifiers
 #pragma pack(pop)
 
 /* window callback -- return is assigned to umsg (return zero to not be processed by arcdps or game) */
-uintptr_t mod_wnd(HWND pWindowHandle, UINT pMessage, WPARAM pAdditionalW, LPARAM pAdditionalL)
+UINT mod_wnd(HWND pWindowHandle, UINT pMessage, WPARAM pAdditionalW, LPARAM pAdditionalL)
 {
 	std::shared_lock shutdown_lock(GlobalObjects::SHUTDOWN_LOCK);
 	if (GlobalObjects::IS_SHUTDOWN == true)
@@ -432,8 +447,6 @@ uintptr_t mod_wnd(HWND pWindowHandle, UINT pMessage, WPARAM pAdditionalW, LPARAM
 
 	ImGui_ProcessKeyEvent(pWindowHandle, pMessage, pAdditionalW, pAdditionalL);
 
-	const ImGuiIO& io = ImGui::GetIO();
-
 	if (pMessage == WM_KEYDOWN || pMessage == WM_SYSKEYDOWN)
 	{
 		int virtualKey = static_cast<int>(pAdditionalW);
@@ -442,8 +455,8 @@ uintptr_t mod_wnd(HWND pWindowHandle, UINT pMessage, WPARAM pAdditionalW, LPARAM
 		ArcModifiers modifiers;
 		memcpy(&modifiers, &e7_rawResult, sizeof(modifiers));
 
-		if ((modifiers._1 == 0 || io.KeysDown[modifiers._1] == true) &&
-			(modifiers._2 == 0 || io.KeysDown[modifiers._2] == true))
+		if ((modifiers._1 == 0 || KeysDown::IsKeyDown(modifiers._1) == true) &&
+			(modifiers._2 == 0 || KeysDown::IsKeyDown(modifiers._2) == true))
 		{
 			std::lock_guard lock(HEAL_TABLE_OPTIONS_MUTEX);
 
@@ -451,10 +464,10 @@ uintptr_t mod_wnd(HWND pWindowHandle, UINT pMessage, WPARAM pAdditionalW, LPARAM
 			for (uint32_t i = 0; i < HEAL_WINDOW_COUNT; i++)
 			{
 				if (HEAL_TABLE_OPTIONS.Windows[i].Hotkey > 0 &&
-					static_cast<size_t>(HEAL_TABLE_OPTIONS.Windows[i].Hotkey) < sizeof(io.KeysDown) &&
+					static_cast<size_t>(HEAL_TABLE_OPTIONS.Windows[i].Hotkey) < KeysDown::Size() &&
 					virtualKey == HEAL_TABLE_OPTIONS.Windows[i].Hotkey)
 				{
-					assert(io.KeysDown[HEAL_TABLE_OPTIONS.Windows[i].Hotkey] == true);
+					assert(KeysDown::IsKeyDown(HEAL_TABLE_OPTIONS.Windows[i].Hotkey) == true);
 
 					HEAL_TABLE_OPTIONS.Windows[i].Shown = !HEAL_TABLE_OPTIONS.Windows[i].Shown;
 					triggeredKey = true;
@@ -463,7 +476,7 @@ uintptr_t mod_wnd(HWND pWindowHandle, UINT pMessage, WPARAM pAdditionalW, LPARAM
 				}
 			}
 			if (HEAL_TABLE_OPTIONS.EvtcRpcEnabledHotkey > 0 &&
-				static_cast<size_t>(HEAL_TABLE_OPTIONS.EvtcRpcEnabledHotkey) < sizeof(io.KeysDown) &&
+				static_cast<size_t>(HEAL_TABLE_OPTIONS.EvtcRpcEnabledHotkey) < KeysDown::Size() &&
 				virtualKey == HEAL_TABLE_OPTIONS.EvtcRpcEnabledHotkey)
 			{
 				HEAL_TABLE_OPTIONS.EvtcRpcEnabled = !HEAL_TABLE_OPTIONS.EvtcRpcEnabled;

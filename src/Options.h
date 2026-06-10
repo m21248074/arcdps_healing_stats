@@ -32,6 +32,9 @@ struct DetailsWindowState : AggregatedStatsEntry
 {
 	bool IsOpen = false;
 
+	float LastFrameLeftSideMinWidth = 0.0f; // In-Memory only
+	float LastFrameRightSideMinWidth = 0.0f; // In-Memory only
+
 	explicit DetailsWindowState(const AggregatedStatsEntry& pEntry);
 };
 
@@ -39,6 +42,7 @@ struct HealWindowContext : HealWindowOptions
 {
 	std::unique_ptr<AggregatedStatsCollection> CurrentAggregatedStats; // In-Memory only
 	time_t LastAggregatedTime = 0; // In-Memory only
+	uintptr_t SelfUniqueId = 0; // In-Memory only
 
 	std::vector<DetailsWindowState> OpenSkillWindows; // In-Memory only
 	std::vector<DetailsWindowState> OpenAgentWindows; // In-Memory only
@@ -48,19 +52,22 @@ struct HealWindowContext : HealWindowOptions
 
 	float LastFrameMinWidth = 0.0f; // In-Memory only
 	size_t CurrentFrameLineCount = 0; // In-Memory only
+	float CurrentFrameExtraHeight = 0.0f; // In-Memory only
 };
 
 struct HealTableOptions
 {
 	AutoUpdateSettingEnum AutoUpdateSetting = AutoUpdateSettingEnum::On;
 	bool DebugMode = false;
+	bool GrpcDnsResolverCAres = false;
 	spdlog::level::level_enum LogLevel = spdlog::level::off;
 	
 	bool EvtcLoggingEnabled = true;
 
-	char EvtcRpcEndpoint[128] = "evtc-rpc.kappa322.com:443";
+	char EvtcRpcEndpoint[128] = "evtc-rpc.kappa322.com";
 	bool EvtcRpcEnabled = false;
 	bool EvtcRpcBudgetMode = false;
+	bool EvtcRpcDisableEncryption = false;
 	int EvtcRpcEnabledHotkey = 0;
 
 	std::array<HealWindowContext, HEAL_WINDOW_COUNT> Windows;
@@ -86,7 +93,7 @@ struct fmt::formatter<HealTableOptions> : SimpleFormatter
 	// Formats the point p using the parsed format specification (presentation)
 	// stored in this formatter.
 	template <typename FormatContext>
-	auto format(const HealTableOptions& pObject, FormatContext& pContext) -> decltype(pContext.out())
+	auto format(const HealTableOptions& pObject, FormatContext& pContext) const
 	{
 		nlohmann::json jsonObject;
 		pObject.ToJson(jsonObject);

@@ -67,8 +67,21 @@ TEST(ConfigTest, Serialize_Deserialize)
 		window.ExcludeOffSquad = rand_t<bool>();
 		window.ExcludeMinions = rand_t<bool>();
 		window.ExcludeUnmapped = rand_t<bool>();
+		window.ExcludeHealing = rand_t<bool>();
+		window.ExcludeBarrierGeneration = rand_t<bool>();
 
 		window.ShowProgressBars = rand_t<bool>();
+		window.UseSubgroupForBarColour = rand_t<bool>();
+		window.IndexNumbers = rand_t<bool>();
+		window.ProfessionText = rand_t<bool>();
+		window.ProfessionIcons = rand_t<bool>();
+		window.ReplacePlayerWithAccountName = rand_t<bool>();
+		window.UseProfessionForNameColour = rand_t<bool>();
+		window.UseSubgroupForNameColour = rand_t<bool>();
+		window.SelfOnTop = rand_t<bool>();
+		window.HideSelfFromList = rand_t<bool>();
+		window.SelfOnly = rand_t<bool>();
+		window.AnonymousMode = rand_t<bool>();
 		rand_string(window.Name);
 		rand_string(window.TitleFormat);
 		rand_string(window.EntryFormat);
@@ -123,8 +136,21 @@ TEST(ConfigTest, Serialize_Deserialize)
 		ASSERT_EQ(windowLeft.ExcludeOffSquad, windowRight.ExcludeOffSquad);
 		ASSERT_EQ(windowLeft.ExcludeMinions, windowRight.ExcludeMinions);
 		ASSERT_EQ(windowLeft.ExcludeUnmapped, windowRight.ExcludeUnmapped);
+		ASSERT_EQ(windowLeft.ExcludeHealing, windowRight.ExcludeHealing);
+		ASSERT_EQ(windowLeft.ExcludeBarrierGeneration, windowRight.ExcludeBarrierGeneration);
 
 		ASSERT_EQ(windowLeft.ShowProgressBars, windowRight.ShowProgressBars);
+		ASSERT_EQ(windowLeft.UseSubgroupForBarColour, windowRight.UseSubgroupForBarColour);
+		ASSERT_EQ(windowLeft.IndexNumbers, windowRight.IndexNumbers);
+		ASSERT_EQ(windowLeft.ProfessionText, windowRight.ProfessionText);
+		ASSERT_EQ(windowLeft.ProfessionIcons, windowRight.ProfessionIcons);
+		ASSERT_EQ(windowLeft.ReplacePlayerWithAccountName, windowRight.ReplacePlayerWithAccountName);
+		ASSERT_EQ(windowLeft.UseProfessionForNameColour, windowRight.UseProfessionForNameColour);
+		ASSERT_EQ(windowLeft.UseSubgroupForNameColour, windowRight.UseSubgroupForNameColour);
+		ASSERT_EQ(windowLeft.SelfOnTop, windowRight.SelfOnTop);
+		ASSERT_EQ(windowLeft.HideSelfFromList, windowRight.HideSelfFromList);
+		ASSERT_EQ(windowLeft.SelfOnly, windowRight.SelfOnly);
+		ASSERT_EQ(windowLeft.AnonymousMode, windowRight.AnonymousMode);
 		ASSERT_EQ(strcmp(windowLeft.Name, windowRight.Name), 0);
 		ASSERT_EQ(strcmp(windowLeft.TitleFormat, windowRight.TitleFormat), 0);
 		ASSERT_EQ(strcmp(windowLeft.EntryFormat, windowRight.EntryFormat), 0);

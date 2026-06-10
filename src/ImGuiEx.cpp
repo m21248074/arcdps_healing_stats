@@ -1,6 +1,6 @@
 #include "ImGuiEx.h"
 
-float ImGuiEx::CalcWindowHeight(size_t pLineCount, ImGuiWindow* pWindow)
+float ImGuiEx::CalcWindowHeight(size_t pLineCount, float pExtraHeight, ImGuiWindow* pWindow)
 {
 	if (pWindow == nullptr)
 	{
@@ -9,14 +9,14 @@ float ImGuiEx::CalcWindowHeight(size_t pLineCount, ImGuiWindow* pWindow)
 
 	//return pWindow->TitleBarHeight() + ImGui::GetStyle().WindowPadding.y * 2 + pLineCount * ImGui::GetTextLineHeightWithSpacing() - ImGui::GetStyle().ItemSpacing.y;
 
-	float decorationsSize = pWindow->TitleBarHeight() + pWindow->MenuBarHeight();
+	float decorationsSize = pWindow->TitleBarHeight + pWindow->MenuBarHeight;
 	float padding = pWindow->WindowPadding.y * 2.0f;
 	float contentSize = 0;
 	if (pLineCount > 0)
 	{
 		contentSize = pLineCount * ImGui::GetTextLineHeight() + (pLineCount - 1) * ImGui::GetStyle().ItemSpacing.y;
 	}
-	return decorationsSize + padding + contentSize;
+	return decorationsSize + padding + contentSize + pExtraHeight;
 }
 
 bool ImGuiEx::SmallCheckBox(const char* pLabel, bool* pIsPressed)
@@ -57,7 +57,7 @@ void ImGuiEx::SmallUnindent()
 	ImGui::Unindent(ImGui::GetCurrentContext()->FontSize);
 }
 
-float ImGuiEx::StatsEntry(std::string_view pLeftText, std::string_view pRightText, std::optional<float> pFillRatio)
+float ImGuiEx::StatsEntry(std::string_view pLeftText, std::string_view pRightText, std::optional<float> pFillRatio, std::optional<float> pBarrierGenerationRatio, std::optional<std::string_view> pIndexNumber, std::optional<std::string> pProfessionText, void* pProfessionIcon, std::optional<ImVec4> pLeftTextColour, std::optional<ImVec4> pHealColour, std::optional<ImVec4> pBarrierGenerationColour, bool pSelf)
 {
 	ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(204, 204, 212, 255));
 	ImGui::BeginGroup();
@@ -69,16 +69,67 @@ float ImGuiEx::StatsEntry(std::string_view pLeftText, std::string_view pRightTex
 
 	ImVec2 leftTextSize = ImGui::CalcTextSize(pLeftText.data(), pLeftText.data() + pLeftText.size());
 	ImVec2 rightTextSize = ImGui::CalcTextSize(pRightText.data(), pRightText.data() + pRightText.size());
+	ImVec2 indexNumberSize = ImVec2();
+	ImVec2 professionTextSize = ImVec2();
+	ImVec2 professionIconSize = ImVec2();
 
 	if (pFillRatio.has_value() == true)
 	{
 		ImVec2 pos = ImGui::GetCursorScreenPos();
-		ImGui::GetWindowDrawList()->AddRectFilled(pos, ImVec2(pos.x + ImGui::GetContentRegionAvailWidth() * *pFillRatio, pos.y + ImGui::GetTextLineHeight()), IM_COL32(102, 178, 102, 128));
+
+		float healingRatio = *pFillRatio;
+
+		ImU32 healingColor = pHealColour.has_value() ? ImGui::ColorConvertFloat4ToU32(*pHealColour) : IM_COL32(102, 178, 102, 128);
+		ImU32 barrierColor = pBarrierGenerationColour.has_value() ? ImGui::ColorConvertFloat4ToU32(*pBarrierGenerationColour) : IM_COL32(255, 225, 0, 128);
+
+		if (pBarrierGenerationRatio.has_value() == true)
+		{
+			float barrierGenerationRatio = *pBarrierGenerationRatio;
+			healingRatio -= barrierGenerationRatio;
+
+			ImVec2 barrierStart = ImVec2(pos.x + ImGui::GetContentRegionAvail().x * healingRatio, pos.y);
+			ImVec2 barrierEnd = ImVec2(pos.x + ImGui::GetContentRegionAvail().x * (healingRatio + barrierGenerationRatio), pos.y + ImGui::GetTextLineHeight());
+
+			ImGui::GetWindowDrawList()->AddRectFilled(barrierStart, barrierEnd, barrierColor);
+		}
+
+		ImVec2 healingStart = pos;
+		ImVec2 healingEnd = ImVec2(pos.x + ImGui::GetContentRegionAvail().x * healingRatio, pos.y + ImGui::GetTextLineHeight());
+
+		ImGui::GetWindowDrawList()->AddRectFilled(healingStart, healingEnd, healingColor);
 	}
 
 	// Add ItemInnerSpacing even if no box is being drawn, that way it looks consistent with and without progress bars
 	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetStyle().ItemInnerSpacing.x);
-	ImGui::TextUnformatted(pLeftText.data(), pLeftText.data() + pLeftText.size());
+	if (pIndexNumber.has_value() == true)
+	{
+		indexNumberSize = ImGui::CalcTextSize(pIndexNumber->data(), pIndexNumber->data() + pIndexNumber->size()) + ImGui::GetStyle().ItemSpacing;
+
+		TextColoredUnformatted(std::optional<ImU32>(IM_COL32(255, 255, 97, 255)), *pIndexNumber);
+		ImGui::SameLine();
+	}
+
+	/* pProfessionIcon can be nullptr when:
+	* 1 - "profession icons" option is disabled in Display settings
+	* 2 - There is no icon for the profession and elite specialization pair
+	* 3 - IconLoader has not finished loading the icon yet
+	*/
+	if (pProfessionIcon != nullptr)
+	{
+		professionTextSize = ImVec2(ImGui::GetFontSize(), ImGui::GetFontSize()) + ImGui::GetStyle().ItemSpacing;
+		ImGui::Image(pProfessionIcon, ImVec2(ImGui::GetFontSize(), ImGui::GetFontSize()));
+		ImGui::SameLine();
+	}
+
+	if (pProfessionText.has_value() == true)
+	{
+		professionTextSize = ImGui::CalcTextSize(pProfessionText->data(), pProfessionText->data() + pProfessionText->size()) + ImGui::GetStyle().ItemSpacing;
+		ImGui::TextUnformatted(pProfessionText->data(), pProfessionText->data() + pProfessionText->size());
+		ImGui::SameLine();
+	}
+
+	auto leftTextColour = pLeftTextColour.has_value() ? ImGui::ColorConvertFloat4ToU32(*pLeftTextColour) : pSelf ? std::optional<ImU32>(IM_COL32(255, 255, 97, 255)) : std::nullopt;
+	TextColoredUnformatted(leftTextColour, pLeftText);
 
 	ImGui::SameLine();
 	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - rightTextSize.x - ImGui::GetStyle().ItemInnerSpacing.x); // Sending x in SameLine messes with alignment when inside of a group
@@ -87,6 +138,20 @@ float ImGuiEx::StatsEntry(std::string_view pLeftText, std::string_view pRightTex
 	ImGui::EndGroup();
 	ImGui::PopStyleColor();
 
-	// window padding - inner spacing - left text - item spacing * 2 - right text - inner spacing - window padding
-	return leftTextSize.x + rightTextSize.x + ImGui::GetStyle().ItemSpacing.x * 2.0f + ImGui::GetStyle().ItemInnerSpacing.x * 2.0f + ImGui::GetCurrentWindowRead()->WindowPadding.x * 2.0f;
+	// one window padding and inner spacing on each edge of the window, two item spacings between left and right text. The other item spacings are accounted for into their respective size calculations already.
+	return indexNumberSize.x + leftTextSize.x + rightTextSize.x + professionTextSize.x + professionIconSize.x + ImGui::GetStyle().ItemSpacing.x * 2.0f + ImGui::GetStyle().ItemInnerSpacing.x * 2.0f + ImGui::GetCurrentWindowRead()->WindowPadding.x * 2.0f;
+}
+
+void ImGuiEx::TextColoredUnformatted(std::optional<ImU32> pColor, std::string_view pText)
+{
+	if (pColor.has_value())
+	{
+		ImGui::PushStyleColor(ImGuiCol_Text, *pColor);
+		ImGui::TextUnformatted(pText.data(), pText.data() + pText.size());
+		ImGui::PopStyleColor();
+	}
+	else
+	{
+		ImGui::TextUnformatted(pText.data(), pText.data() + pText.size());
+	}
 }

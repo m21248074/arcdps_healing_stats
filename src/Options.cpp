@@ -129,6 +129,12 @@ HealTableOptions::HealTableOptions()
 	snprintf(Windows[5].Name, sizeof(Windows[5].Name), "%s", u8"隊員輸出治療");
 	snprintf(Windows[5].TitleFormat, sizeof(Windows[5].TitleFormat), "%s", u8"輸出治療 {1} ({4}/秒，進入戰鬥{7}秒)");
 
+	Windows[6].DataSourceChoice = DataSource::PeersOutgoing;
+	Windows[6].ExcludeHealing = true;
+	Windows[6].ExcludeBarrierGeneration = false;
+	snprintf(Windows[6].Name, sizeof(Windows[6].Name), "%s", "Peers barrier generation");
+	snprintf(Windows[6].TitleFormat, sizeof(Windows[6].TitleFormat), "%s", "Barrier generation {1} ({4}/s, {7}s in combat)");
+
 	Windows[9].DataSourceChoice = DataSource::Combined;
 	snprintf(Windows[9].Name, sizeof(Windows[9].Name), "%s", u8"綜合");
 	snprintf(Windows[9].TitleFormat, sizeof(Windows[9].TitleFormat), "%s", u8"綜合 {1} ({4}/秒，進入戰鬥{7}秒)");
@@ -315,11 +321,13 @@ void HealTableOptions::FromJson(const nlohmann::json& pJsonObject)
 
 	GetJsonValue(pJsonObject, "AutoUpdateSetting", AutoUpdateSetting);
 	GetJsonValue(pJsonObject, "DebugMode", DebugMode);
+	GetJsonValue(pJsonObject, "GrpcDnsResolverCAres", GrpcDnsResolverCAres);
 	GetJsonValue(pJsonObject, "LogLevel", LogLevel);
 	GetJsonValue(pJsonObject, "EvtcLoggingEnabled", EvtcLoggingEnabled);
 	GetJsonValue(pJsonObject, "EvtcRpcEndpoint", EvtcRpcEndpoint);
 	GetJsonValue(pJsonObject, "EvtcRpcEnabled", EvtcRpcEnabled);
 	GetJsonValue(pJsonObject, "EvtcRpcBudgetMode", EvtcRpcBudgetMode);
+	GetJsonValue(pJsonObject, "EvtcRpcDisableEncryption", EvtcRpcDisableEncryption);
 	GetJsonValue(pJsonObject, "EvtcRpcEnabledHotkey", EvtcRpcEnabledHotkey);
 
 	const auto iter = pJsonObject.find("Windows");
@@ -373,11 +381,13 @@ do {\
 
 	SET_JSON_VAL(AutoUpdateSetting);
 	SET_JSON_VAL(DebugMode);
+	SET_JSON_VAL(GrpcDnsResolverCAres);
 	SET_JSON_VAL(LogLevel);
 	SET_JSON_VAL(EvtcLoggingEnabled);
 	SET_JSON_VAL_CSTR_ARRAY(EvtcRpcEndpoint);
 	SET_JSON_VAL(EvtcRpcEnabled);
 	SET_JSON_VAL(EvtcRpcBudgetMode);
+	SET_JSON_VAL(EvtcRpcDisableEncryption);
 	SET_JSON_VAL(EvtcRpcEnabledHotkey);
 
 	nlohmann::json windows;
@@ -421,8 +431,22 @@ void HealWindowOptions::FromJson(const nlohmann::json& pJsonObject)
 	GetJsonValue(pJsonObject, "ExcludeOffSquad", ExcludeOffSquad);
 	GetJsonValue(pJsonObject, "ExcludeMinions", ExcludeMinions);
 	GetJsonValue(pJsonObject,  "ExcludeUnmapped", ExcludeUnmapped);
+	GetJsonValue(pJsonObject, "ExcludeHealing", ExcludeHealing);
+	GetJsonValue(pJsonObject, "ExcludeBarrierGeneration", ExcludeBarrierGeneration);
 
 	GetJsonValue(pJsonObject, "ShowProgressBars", ShowProgressBars);
+	GetJsonValue(pJsonObject, "UseSubgroupForBarColour", UseSubgroupForBarColour);
+	GetJsonValue(pJsonObject, "UseProfessionForBarColour", UseProfessionForBarColour);
+	GetJsonValue(pJsonObject, "IndexNumbers", IndexNumbers);
+	GetJsonValue(pJsonObject, "ProfessionText", ProfessionText);
+	GetJsonValue(pJsonObject, "ProfessionIcons", ProfessionIcons);
+	GetJsonValue(pJsonObject, "ReplacePlayerWithAccountName", ReplacePlayerWithAccountName);
+	GetJsonValue(pJsonObject, "UseProfessionForNameColour", UseProfessionForNameColour);
+	GetJsonValue(pJsonObject, "UseSubgroupForNameColour", UseSubgroupForNameColour);
+	GetJsonValue(pJsonObject, "SelfOnTop", SelfOnTop);
+	GetJsonValue(pJsonObject, "HideSelfFromList", HideSelfFromList);
+	GetJsonValue(pJsonObject, "SelfOnly", SelfOnly);
+	GetJsonValue(pJsonObject, "AnonymousMode", AnonymousMode);
 	GetJsonValue(pJsonObject, "Name", Name);
 	GetJsonValue(pJsonObject, "TitleFormat", TitleFormat);
 	GetJsonValue(pJsonObject, "EntryFormat", EntryFormat);
@@ -474,8 +498,22 @@ do {\
 	SET_JSON_VAL(ExcludeOffSquad);
 	SET_JSON_VAL(ExcludeMinions);
 	SET_JSON_VAL(ExcludeUnmapped);
+	SET_JSON_VAL(ExcludeHealing);
+	SET_JSON_VAL(ExcludeBarrierGeneration);
 
 	SET_JSON_VAL(ShowProgressBars);
+	SET_JSON_VAL(UseSubgroupForBarColour);
+	SET_JSON_VAL(UseProfessionForBarColour);
+	SET_JSON_VAL(IndexNumbers);
+	SET_JSON_VAL(ProfessionText);
+	SET_JSON_VAL(ProfessionIcons);
+	SET_JSON_VAL(ReplacePlayerWithAccountName);
+	SET_JSON_VAL(UseProfessionForNameColour);
+	SET_JSON_VAL(UseSubgroupForNameColour);
+	SET_JSON_VAL(SelfOnTop);
+	SET_JSON_VAL(HideSelfFromList);
+	SET_JSON_VAL(SelfOnly);
+	SET_JSON_VAL(AnonymousMode);
 	SET_JSON_VAL_CSTR_ARRAY(Name);
 	SET_JSON_VAL_CSTR_ARRAY(TitleFormat);
 	SET_JSON_VAL_CSTR_ARRAY(EntryFormat);

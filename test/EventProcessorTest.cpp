@@ -11,6 +11,8 @@
 #include "Exports.h"
 #include "Utilities.h"
 
+#include <timeapi.h>
+
 TEST(EventProcessorTest, ImplicitSelfCombatExitOnSelfDeregister)
 {
 	EventProcessor processor;
@@ -247,7 +249,7 @@ TEST(EventProcessorTest, LogStart)
 
 	// send log start without logging enabled, should not produce event
 	cbtevent ev = {};
-	ev.is_statechange = CBTS_LOGSTART;
+	ev.is_statechange = CBTS_SQCOMBATSTART;
 
 	processor.SetEvtcLoggingEnabled(false);
 	processor.AreaCombat(&ev, nullptr, nullptr, nullptr, 0, 0);

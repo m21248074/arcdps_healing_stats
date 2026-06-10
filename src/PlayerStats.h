@@ -1,5 +1,6 @@
 #pragma once
-#include "arcdps_structs.h"
+
+#include <ArcdpsExtension/arcdps_structs.h>
 
 #include <stdint.h>
 
@@ -14,8 +15,9 @@ struct HealEvent
 	const uint64_t Size = 0;
 	const uintptr_t AgentId = 0;
 	const uint32_t SkillId = 0;
+	const bool IsBarrierGeneration = false;
 
-	HealEvent(uint64_t pTime, uint64_t pSize, uintptr_t pAgentId, uint32_t pSkillId);
+	HealEvent(uint64_t pTime, uint64_t pSize, uintptr_t pAgentId, uint32_t pSkillId, bool pIsBarrierGeneration);
 
 	bool operator==(const HealEvent& pRight) const;
 	bool operator!=(const HealEvent& pRight) const;
@@ -46,6 +48,7 @@ public:
 
 	void DamageEvent(uint64_t pTime);
 	void HealingEvent(cbtevent* pEvent, uintptr_t pDestinationAgentId);
+	void BarrierGenerationEvent(cbtevent* pEvent, uintptr_t pDestinationAgentId);
 
 	HealingStatsSlim GetState();
 

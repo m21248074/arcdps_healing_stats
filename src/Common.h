@@ -1,5 +1,6 @@
 #pragma once
-#include "arcdps_structs_slim.h"
+
+#include <ArcdpsExtension/arcdps_structs_slim.h>
 
 enum class EventType
 {
@@ -20,17 +21,22 @@ static inline EventType GetEventType(const cbtevent* pEvent, bool pIsLocal)
 	{
 		switch (pEvent->result)
 		{
-		case CBTR_NORMAL:
-		case CBTR_CRIT:
-		case CBTR_GLANCE:
+		case CBTR_STRIKE_DAMAGENORMAL:
+		case CBTR_STRIKE_DAMAGECRIT:
+		case CBTR_STRIKE_DAMAGEGLANCE:
 			break;
-		case CBTR_ACTIVATION:
+		case CBTR_SKILLCAST:
 			return EventType::Other;
 		default:
 			return EventType::SemiDamaging; // Breakbar / misc.
 		}
 
-		if ((pIsLocal && pEvent->value <= 0) || (!pIsLocal && pEvent->value >= 0))
+		if (pEvent->value == 0)
+		{
+			return EventType::SemiDamaging;
+		}
+
+		if ((pIsLocal && pEvent->value < 0) || (!pIsLocal && pEvent->value > 0))
 		{
 			return EventType::Damage; // Direct damage
 		}
@@ -45,7 +51,7 @@ static inline EventType GetEventType(const cbtevent* pEvent, bool pIsLocal)
 		{
 			return EventType::SemiDamaging; // Buff apply
 		}
-		else if ((pIsLocal && pEvent->buff_dmg <= 0) || (!pIsLocal && pEvent->buff_dmg >= 0))
+		else if ((pIsLocal && pEvent->buff_dmg < 0) || (!pIsLocal && pEvent->buff_dmg > 0))
 		{
 			return EventType::Damage; // Buff damage
 		}

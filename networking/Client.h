@@ -1,5 +1,6 @@
 #pragma once
-#include "arcdps_structs_slim.h"
+
+#include <ArcdpsExtension/arcdps_structs_slim.h>
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -36,6 +37,7 @@
 struct evtc_rpc_client_status
 {
 	bool Connected = false;
+	bool Encrypted = false;
 	std::chrono::steady_clock::time_point ConnectTime;
 	std::string Endpoint;
 };
@@ -44,12 +46,18 @@ class evtc_rpc_client
 {
 	typedef void(*PeerCombatCallbackSignature)(cbtevent* pEvent);
 
+	struct PeerInfo
+	{
+		uint16_t InstanceId = 0;
+		std::string AccountName;
+	};
+
 	struct ConnectionContext
 	{
 		bool ForceDisconnected = false;
 		bool WritePending = false;
 		uint16_t RegisteredInstanceId = 0;
-		std::map<uint16_t, std::string> RegisteredPeers;
+		std::map<uintptr_t /*UniqueId*/, PeerInfo> RegisteredPeers;
 
 		grpc::ClientContext ClientContext;
 		std::shared_ptr<grpc::Channel> Channel;
@@ -186,6 +194,7 @@ public:
 	evtc_rpc_client_status GetStatus();
 	void SetEnabledStatus(bool pEnabledStatus);
 	void SetBudgetMode(bool pBudgetMode);
+	void SetDisableEncryption(bool pDisableEncryption);
 
 	uintptr_t ProcessLocalEvent(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision);
 	uintptr_t ProcessAreaEvent(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision);
@@ -215,6 +224,7 @@ private:
 
 	std::atomic_bool mDisabled{false};
 	std::atomic_bool mBudgetMode{false};
+	std::atomic_bool mDisableEncryption{false};
 	std::atomic_bool mShouldShutdown{false};
 	bool mShutdown = false;
 	std::chrono::steady_clock::time_point mLastConnectionAttempt;
@@ -227,7 +237,7 @@ private:
 	uint16_t mInstanceId = 0;
 
 	std::mutex mPeerInfoLock;
-	std::map<uint16_t, std::string> mPeers;
+	std::map<uintptr_t /*UniqueId*/, PeerInfo> mPeers;
 
 	std::mutex mStatusLock;
 	evtc_rpc_client_status mStatus;

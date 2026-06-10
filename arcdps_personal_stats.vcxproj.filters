@@ -51,24 +51,6 @@
     <ClCompile Include="src\AggregatedStatsCollection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="arcdps_mock\arcdps-extension\Widgets.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="arcdps_mock\imgui\imgui.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="arcdps_mock\imgui\imgui_draw.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="arcdps_mock\imgui\imgui_tables.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="arcdps_mock\imgui\imgui_widgets.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="modules\arcdps_extension\UpdateCheckerBase.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\UpdateGUI.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -119,25 +101,19 @@
     <ClInclude Include="src\AddonVersion.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="arcdps_mock\arcdps-extension\Widgets.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="arcdps_mock\imgui\imconfig.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="arcdps_mock\imgui\imgui.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="arcdps_mock\imgui\imgui_internal.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\Common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="modules\arcdps_extension\UpdateCheckerBase.h">
+    <ClInclude Include="src\UpdateGUI.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\UpdateGUI.h">
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\SpecializationData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\KeysDown.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

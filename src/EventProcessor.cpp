@@ -8,6 +8,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <timeapi.h>
 
 [[maybe_unused]]
 static void PrintEvent(cbtevent* pEvent)
@@ -107,7 +108,7 @@ void EventProcessor::AreaCombat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestina
 			// name == nullptr here shouldn't be able to happen through arcdps, but it makes unit testing easier :)
 			if (pSourceAgent->name != nullptr)
 			{
-				mAgentTable.AddAgent(pSourceAgent->id, static_cast<uint16_t>(pDestinationAgent->id), pSourceAgent->name, pDestinationAgent->team, std::nullopt, isPlayer);
+				mAgentTable.AddAgent(pSourceAgent->id, static_cast<uint16_t>(pDestinationAgent->id), pSourceAgent->name, pDestinationAgent->name, pDestinationAgent->team, std::nullopt, isPlayer, pDestinationAgent->prof, pDestinationAgent->elite);
 			}
 		}
 		else
@@ -115,16 +116,17 @@ void EventProcessor::AreaCombat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestina
 			LOG("Deregister agent %s %llu %x %x %u %u ; %s %llu %x %x %u %u",
 				pSourceAgent->name, pSourceAgent->id, pSourceAgent->prof, pSourceAgent->elite, pSourceAgent->team, pSourceAgent->self,
 				pDestinationAgent->name, pDestinationAgent->id, pDestinationAgent->prof, pDestinationAgent->elite, pDestinationAgent->team, pDestinationAgent->self);
+			// pDestinationAgent is invalid in deregister events (keep trying to log it though - might have some useful information for debugging :))
+			pDestinationAgent = nullptr;
 
-			// If it's a player, process implicit combat exit
-			if (pDestinationAgent->name != nullptr && pDestinationAgent->name[0] != '\0')
+			// If it's a known player, process implicit combat exit
 			{
 				std::lock_guard lock(mPeerStatesLock);
 				const auto iter = mPeerStates.find(pSourceAgent->id);
 				if (iter != mPeerStates.end())
 				{
 					iter->second->ExitedCombat(timeGetTime());
-					LogI("Implicit exit combat for peer unique_id={} character_name='{}' account_name='{}'", pSourceAgent->id, pSourceAgent->name, pDestinationAgent->name);
+					LogI("Implicit exit combat for peer unique_id={} character_name='{}'", pSourceAgent->id, pSourceAgent->name);
 				}
 			}
 		}
@@ -132,9 +134,9 @@ void EventProcessor::AreaCombat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestina
 		return;
 	}
 
-	if (pEvent->is_statechange == CBTS_LOGSTART)
+	if (pEvent->is_statechange == CBTS_SQCOMBATSTART)
 	{
-		LogI("CBTS_LOGSTART - server_timestamp={} local_timestamp={}, species_id={}", pEvent->value, pEvent->buff_dmg, pEvent->src_agent);
+		LogI("CBTS_SQCOMBATSTART - server_timestamp={} local_timestamp={}, species_id={}", pEvent->value, pEvent->buff_dmg, pEvent->src_agent);
 
 		cbtevent logEvent = {};
 
@@ -196,7 +198,8 @@ void EventProcessor::AreaCombat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestina
 		// name == nullptr here shouldn't be able to happen through arcdps, but it makes unit testing easier :)
 		if (pSourceAgent->name != nullptr)
 		{
-			mAgentTable.AddAgent(pSourceAgent->id, pEvent->src_instid, pSourceAgent->name, static_cast<uint16_t>(pEvent->dst_agent), isMinion, isPlayer);
+			// pDestinationAgent doesn't store any information about the source agent so we can't get the account name
+			mAgentTable.AddAgent(pSourceAgent->id, pEvent->src_instid, pSourceAgent->name, nullptr, static_cast<uint16_t>(pEvent->dst_agent), isMinion, isPlayer, pSourceAgent->prof, pSourceAgent->elite);
 		}
 
 		return;
@@ -260,7 +263,7 @@ void EventProcessor::LocalCombat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestin
 			// name == nullptr here shouldn't be able to happen through arcdps, but it makes unit testing easier :)
 			if (pSourceAgent->name != nullptr)
 			{
-				mAgentTable.AddAgent(pSourceAgent->id, static_cast<uint16_t>(pDestinationAgent->id), pSourceAgent->name, pDestinationAgent->team, std::nullopt, isPlayer);
+				mAgentTable.AddAgent(pSourceAgent->id, static_cast<uint16_t>(pDestinationAgent->id), pSourceAgent->name, pDestinationAgent->name, pDestinationAgent->team, std::nullopt, isPlayer, pDestinationAgent->prof, pDestinationAgent->elite);
 			}
 
 			if (pDestinationAgent->self != 0)
@@ -277,8 +280,10 @@ void EventProcessor::LocalCombat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestin
 			LOG("Deregister agent %s %llu %x %x %u %u ; %s %llu %x %x %u %u",
 				pSourceAgent->name, pSourceAgent->id, pSourceAgent->prof, pSourceAgent->elite, pSourceAgent->team, pSourceAgent->self,
 				pDestinationAgent->name, pDestinationAgent->id, pDestinationAgent->prof, pDestinationAgent->elite, pDestinationAgent->team, pDestinationAgent->self);
+			// pDestinationAgent is invalid in deregister events (keep trying to log it though - might have some useful information for debugging :))
+			pDestinationAgent = nullptr;
 
-			if (pDestinationAgent->id == mSelfInstanceId.load(std::memory_order_relaxed))
+			if (pSourceAgent->id == mSelfUniqueId.load(std::memory_order_relaxed))
 			{
 				LOG("Exiting combat since self agent was deregistered");
 				mLocalState.ExitedCombat(timeGetTime());
@@ -419,12 +424,6 @@ void EventProcessor::LocalCombat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestin
 		GlobalObjects::ARC_E10(&logEvent, HEALING_STATS_ADDON_SIGNATURE);
 	}
 
-	if (pEvent->is_shields != 0)
-	{
-		// Shield application - not tracking for now
-		return;
-	}
-
 	if (pSourceAgent->self == 0 &&
 		pEvent->src_master_instid != selfInstanceId)
 	{
@@ -435,10 +434,18 @@ void EventProcessor::LocalCombat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestin
 	// Register agent if it's not already known
 	if (pDestinationAgent->name != nullptr)
 	{
-		mAgentTable.AddAgent(pDestinationAgent->id, pEvent->dst_instid, pDestinationAgent->name, std::nullopt, pEvent->dst_master_instid != 0, std::nullopt);
+		// As pDestinationAgent->name contains the character name, there's no source for the account name, so we pass nullptr. pSourceAgent->name also has the character name
+		mAgentTable.AddAgent(pDestinationAgent->id, pEvent->dst_instid, pDestinationAgent->name, nullptr, std::nullopt, pEvent->dst_master_instid != 0, std::nullopt, pDestinationAgent->prof, pDestinationAgent->elite);
 	}
 
-	mLocalState.HealingEvent(pEvent, pDestinationAgent->id);
+	if (pEvent->is_shields != 0)
+	{
+		mLocalState.BarrierGenerationEvent(pEvent, pDestinationAgent->id);
+	}
+	else
+	{
+		mLocalState.HealingEvent(pEvent, pDestinationAgent->id);
+	}
 
 	uint32_t healedAmount = pEvent->value;
 	if (healedAmount == 0)
@@ -446,7 +453,15 @@ void EventProcessor::LocalCombat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestin
 		healedAmount = pEvent->buff_dmg;
 		assert(healedAmount != 0);
 	}
-	LOG("Registered heal event id %llu size %i from %s:%u to %s:%llu", pId, healedAmount, mSkillTable->GetSkillName(pEvent->skillid), pEvent->skillid, pDestinationAgent->name, pDestinationAgent->id);
+
+	if (pEvent->is_shields != 0)
+	{
+		LOG("Registered barrier generation event id %llu size %i from %s:%u to %s:%llu", pId, healedAmount, mSkillTable->GetSkillName(pEvent->skillid), pEvent->skillid, pDestinationAgent->name, pDestinationAgent->id);
+	}
+	else
+	{
+		LOG("Registered heal event id %llu size %i from %s:%u to %s:%llu", pId, healedAmount, mSkillTable->GetSkillName(pEvent->skillid), pEvent->skillid, pDestinationAgent->name, pDestinationAgent->id);
+	}
 }
 
 void EventProcessor::PeerCombat(cbtevent* pEvent, uint16_t pPeerInstanceId)
@@ -568,12 +583,6 @@ void EventProcessor::PeerCombat(cbtevent* pEvent, uint16_t pPeerInstanceId)
 		return;
 	}
 
-	if (pEvent->is_shields != 0)
-	{
-		// Shield application - not tracking for now
-		return;
-	}
-
 	if (pEvent->src_instid != pPeerInstanceId &&
 		pEvent->src_master_instid != pPeerInstanceId)
 	{
@@ -581,7 +590,14 @@ void EventProcessor::PeerCombat(cbtevent* pEvent, uint16_t pPeerInstanceId)
 		return;
 	}
 
-	state->HealingEvent(pEvent, *dstUniqueId);
+	if (pEvent->is_shields != 0)
+	{
+		state->BarrierGenerationEvent(pEvent, *dstUniqueId);
+	}
+	else
+	{
+		state->HealingEvent(pEvent, *dstUniqueId);
+	}
 
 	uint32_t healedAmount = pEvent->value;
 	if (healedAmount == 0)
@@ -589,12 +605,20 @@ void EventProcessor::PeerCombat(cbtevent* pEvent, uint16_t pPeerInstanceId)
 		healedAmount = pEvent->buff_dmg;
 		assert(healedAmount != 0);
 	}
-	LOG("Registered heal event size %i from %s:%u to %llu", healedAmount, mSkillTable->GetSkillName(pEvent->skillid), pEvent->skillid, *dstUniqueId);
+
+	if (pEvent->is_shields != 0)
+	{
+		LOG("Registered barrier generation event size %i from %s:%u to %llu", healedAmount, mSkillTable->GetSkillName(pEvent->skillid), pEvent->skillid, *dstUniqueId);
+	}
+	else
+	{
+		LOG("Registered heal event size %i from %s:%u to %llu", healedAmount, mSkillTable->GetSkillName(pEvent->skillid), pEvent->skillid, *dstUniqueId);
+	}
 }
 
-std::pair<uintptr_t, std::map<uintptr_t, std::pair<std::string, HealingStats>>> EventProcessor::GetState(uintptr_t pSelfUniqueId)
+std::pair<uintptr_t, std::map<uintptr_t, std::pair<HealedAgent, HealingStats>>> EventProcessor::GetState(uintptr_t pSelfUniqueId)
 {
-	std::map<uintptr_t, std::pair<std::string, HealingStats>> result;
+	std::map<uintptr_t, std::pair<HealedAgent, HealingStats>> result;
 	uint64_t collectionTime = timeGetTime();
 	if (pSelfUniqueId == 0)
 	{
@@ -610,14 +634,14 @@ std::pair<uintptr_t, std::map<uintptr_t, std::pair<std::string, HealingStats>>> 
 	localEntry->second.second.Agents = mAgentTable.GetState();
 	localEntry->second.second.Skills = std::shared_ptr(mSkillTable);
 
-	std::optional<std::string> localName = mAgentTable.GetName(pSelfUniqueId);
-	if (localName.has_value())
+	std::optional<HealedAgent> localAgentData = mAgentTable.GetAgentData(pSelfUniqueId);
+	if (localAgentData.has_value())
 	{
-		localEntry->second.first = std::move(*localName);
+		localEntry->second.first = std::move(*localAgentData);
 	}
 	else
 	{
-		localEntry->second.first = "local (unmapped)";
+		localEntry->second.first = HealedAgent{"local (unmapped)"};
 	}
 
 
@@ -642,17 +666,17 @@ std::pair<uintptr_t, std::map<uintptr_t, std::pair<std::string, HealingStats>>> 
 		entry->second.second.Agents = mAgentTable.GetState();
 		entry->second.second.Skills = std::shared_ptr(mSkillTable);
 		
-		std::optional<std::string> name = mAgentTable.GetName(uniqueId);
-		if (name.has_value())
+		std::optional<HealedAgent> agentData = mAgentTable.GetAgentData(uniqueId);
+		if (agentData.has_value())
 		{
-			entry->second.first = std::move(*name);
+			entry->second.first = std::move(*agentData);
 		}
 		else
 		{
-			entry->second.first = "peer (unmapped)";
+			entry->second.first = HealedAgent{"peer (unmapped)"};
 		}
 
-		DEBUGLOG("peer %llu %s, %zu events", uniqueId, entry->second.first.c_str(), entry->second.second.Events.size());
+		DEBUGLOG("peer %llu %s, %zu events", uniqueId, entry->second.first.Name.c_str(), entry->second.second.Events.size());
 	}
 
 	DEBUGLOG("self %llu, %zu entries", pSelfUniqueId, result.size());

@@ -25,7 +25,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Address Sanitizer|x64'" Label="Configuration">
@@ -37,7 +37,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -89,14 +89,15 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NOMINMAX;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;_DEBUG;ARCDPSHEALINGSTATS_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;_DEBUG;ARCDPSHEALINGSTATS_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <PrecompiledHeaderFile />
       <AdditionalIncludeDirectories>..\modules\arcdps_extension;..\src;$(SolutionDir)$(Platform)\autogen</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalOptions>/Zc:char8_t- %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <ExternalWarningLevel>Level2</ExternalWarningLevel>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -110,16 +111,16 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NOMINMAX;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;ARCDPSHEALINGSTATS_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;ARCDPSHEALINGSTATS_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>..\modules\arcdps_extension;..\src;$(SolutionDir)$(Platform)\autogen</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
-      <AdditionalOptions>/Zc:char8_t- %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -136,14 +137,15 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NOMINMAX;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;NDEBUG;ARCDPSHEALINGSTATS_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;NDEBUG;ARCDPSHEALINGSTATS_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <PrecompiledHeaderFile />
       <AdditionalIncludeDirectories>..\modules\arcdps_extension;..\src;$(SolutionDir)$(Platform)\autogen</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalOptions>/Zc:char8_t- %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <ExternalWarningLevel>Level2</ExternalWarningLevel>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -166,6 +168,54 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\vcpkg_installed\x64-windows-static\x64-windows\share\grpc\roots.pem" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\icons\specs\000.png" />
+    <Image Include="..\icons\specs\001.png" />
+    <Image Include="..\icons\specs\002.png" />
+    <Image Include="..\icons\specs\003.png" />
+    <Image Include="..\icons\specs\004.png" />
+    <Image Include="..\icons\specs\005.png" />
+    <Image Include="..\icons\specs\006.png" />
+    <Image Include="..\icons\specs\007.png" />
+    <Image Include="..\icons\specs\008.png" />
+    <Image Include="..\icons\specs\009.png" />
+    <Image Include="..\icons\specs\e101.png" />
+    <Image Include="..\icons\specs\e102.png" />
+    <Image Include="..\icons\specs\e103.png" />
+    <Image Include="..\icons\specs\e104.png" />
+    <Image Include="..\icons\specs\e201.png" />
+    <Image Include="..\icons\specs\e202.png" />
+    <Image Include="..\icons\specs\e203.png" />
+    <Image Include="..\icons\specs\e204.png" />
+    <Image Include="..\icons\specs\e301.png" />
+    <Image Include="..\icons\specs\e302.png" />
+    <Image Include="..\icons\specs\e303.png" />
+    <Image Include="..\icons\specs\e304.png" />
+    <Image Include="..\icons\specs\e401.png" />
+    <Image Include="..\icons\specs\e402.png" />
+    <Image Include="..\icons\specs\e403.png" />
+    <Image Include="..\icons\specs\e404.png" />
+    <Image Include="..\icons\specs\e501.png" />
+    <Image Include="..\icons\specs\e502.png" />
+    <Image Include="..\icons\specs\e503.png" />
+    <Image Include="..\icons\specs\e504.png" />
+    <Image Include="..\icons\specs\e601.png" />
+    <Image Include="..\icons\specs\e602.png" />
+    <Image Include="..\icons\specs\e603.png" />
+    <Image Include="..\icons\specs\e604.png" />
+    <Image Include="..\icons\specs\e701.png" />
+    <Image Include="..\icons\specs\e702.png" />
+    <Image Include="..\icons\specs\e703.png" />
+    <Image Include="..\icons\specs\e704.png" />
+    <Image Include="..\icons\specs\e801.png" />
+    <Image Include="..\icons\specs\e802.png" />
+    <Image Include="..\icons\specs\e803.png" />
+    <Image Include="..\icons\specs\e804.png" />
+    <Image Include="..\icons\specs\e901.png" />
+    <Image Include="..\icons\specs\e902.png" />
+    <Image Include="..\icons\specs\e903.png" />
+    <Image Include="..\icons\specs\e904.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

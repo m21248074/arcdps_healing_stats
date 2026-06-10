@@ -7,13 +7,13 @@
 #pragma warning(pop)
 
 #include "AggregatedStatsCollection.h"
-#include "arcdps_mock/CombatMock.h"
 #include "Exports.h"
 #include "Log.h"
 #include "Options.h"
 #include "../networking/Client.h"
 #include "../networking/Server.h"
 
+#include <ArcdpsMock/arcdps_mock/CombatMock.h>
 #include <utility>
 
 namespace
@@ -141,7 +141,7 @@ void FillRandomData(void* pBuffer, size_t pBufferSize)
 {
 	for (size_t i = 0; i < pBufferSize; i++)
 	{
-		static_cast<byte*>(pBuffer)[i] = rand() % 256;
+		static_cast<char*>(pBuffer)[i] = rand() % 256;
 	}
 }
 } // anonymous namespace
@@ -243,16 +243,15 @@ namespace
 {
 static EventProcessor* ACTIVE_PROCESSOR = nullptr;
 static evtc_rpc_client* ACTIVE_CLIENT = nullptr;
-uintptr_t network_test_mod_combat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision)
+void network_test_mod_combat(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision)
 {
 	ACTIVE_PROCESSOR->AreaCombat(pEvent, pSourceAgent, pDestinationAgent, pSkillname, pId, pRevision);
 	ACTIVE_CLIENT->ProcessAreaEvent(pEvent, pSourceAgent, pDestinationAgent, pSkillname, pId, pRevision);
-	return 0;
 }
 
 /* combat callback -- may be called asynchronously. return ignored */
 /* one participant will be party/squad, or minion of. no spawn statechange events. despawn statechange only on marked boss npcs */
-uintptr_t network_test_mod_combat_local(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision)
+void network_test_mod_combat_local(cbtevent* pEvent, ag* pSourceAgent, ag* pDestinationAgent, const char* pSkillname, uint64_t pId, uint64_t pRevision)
 {
 	std::optional<cbtevent> modifiedEvent = std::nullopt;
 	ACTIVE_PROCESSOR->LocalCombat(pEvent, pSourceAgent, pDestinationAgent, pSkillname, pId, pRevision, &modifiedEvent);
@@ -262,8 +261,6 @@ uintptr_t network_test_mod_combat_local(cbtevent* pEvent, ag* pSourceAgent, ag* 
 	}
 
 	ACTIVE_CLIENT->ProcessLocalEvent(pEvent, pSourceAgent, pDestinationAgent, pSkillname, pId, pRevision);
-
-	return 0;
 }
 }; // Anonymous namespace
 
@@ -273,7 +270,7 @@ class NetworkXevtcTestFixture : public ::testing::TestWithParam<bool>
 protected:
 	void SetUp() override
 	{
-		get_init_addr("unit_test", nullptr, nullptr, GetModuleHandle(NULL), malloc, free); // Initialize exports
+		get_init_addr("unit_test", nullptr, nullptr, GetModuleHandle(NULL), malloc, free, 0); // Initialize exports
 
 		uint64_t seed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 		srand(static_cast<uint32_t>(seed));
@@ -382,7 +379,7 @@ protected:
 		// Add the fake self agent we use below to split stats into local and peer (otherwise we just get local stats since
 		// the instance id matches that of the peer and they both use the same event processor)
 		uintptr_t localFakeSelfUniqueId = 100000;
-		Processor.mAgentTable.AddAgent(localFakeSelfUniqueId, static_cast<uint16_t>(UINT16_MAX - 2), "Local Fake Self", static_cast<uint16_t>(1), false, true);
+		Processor.mAgentTable.AddAgent(localFakeSelfUniqueId, static_cast<uint16_t>(UINT16_MAX - 2), "Local Fake Self", nullptr, static_cast<uint16_t>(1), false, true, Prof::PROF_UNKNOWN, 0xFFFFFFFF);
 
 		// Send the events themselves
 		uint32_t result = Mock.ExecuteFromXevtc(pLogPath, 0, 0);
@@ -500,7 +497,7 @@ TEST_F(SimpleNetworkTestFixture, RegisterSelf)
 		// Wait until the server sees the new agent and then verify the state
 		auto start = std::chrono::system_clock::now();
 		bool completed = false;
-		while ((std::chrono::system_clock::now() - start) < std::chrono::milliseconds(200))
+		while ((std::chrono::system_clock::now() - start) < std::chrono::milliseconds(1000))
 		{
 			{
 				std::lock_guard lock(Server->mRegisteredAgentsLock);
@@ -529,6 +526,178 @@ TEST_F(SimpleNetworkTestFixture, RegisterSelf)
 			EXPECT_EQ(iter->second->InstanceId, instid);
 			EXPECT_EQ(iter->second->Peers.size(), 0);
 		}
+	}
+}
+
+TEST_F(SimpleNetworkTestFixture, RegisterSelfDuplicate)
+{
+	ClientInstance& client1 = NewClient();
+	ClientInstance& client2 = NewClient();
+
+	// Send a self agent registration event
+	ag ag1{};
+	ag ag2{};
+	ag1.elite = 0;
+	ag1.prof = static_cast<Prof>(1);
+	ag2.self = 1;
+	ag2.id = 13;
+	ag2.name = "testagent.1234";
+
+	client1->ProcessLocalEvent(nullptr, &ag1, &ag2, nullptr, 0, 0);
+	client1->FlushEvents();
+
+	// Wait until the server sees the new agent
+	{
+		bool completed = false;
+		auto start = std::chrono::system_clock::now();
+		while ((std::chrono::system_clock::now() - start) < std::chrono::milliseconds(1000))
+		{
+			{
+				std::lock_guard lock(Server->mRegisteredAgentsLock);
+				if (Server->mRegisteredAgents.size() >= 1)
+				{
+					auto iter = Server->mRegisteredAgents.find("testagent.1234");
+					if (iter != Server->mRegisteredAgents.end() && iter->second->InstanceId == 13)
+					{
+						completed = true;
+						break;
+					}
+				}
+			}
+
+			Sleep(1);
+		}
+		EXPECT_TRUE(completed);
+	}
+
+	std::chrono::steady_clock::time_point beforeConflictingEvent = std::chrono::steady_clock::now();
+
+	// Send a conflicting registration
+	client2->ProcessLocalEvent(nullptr, &ag1, &ag2, nullptr, 0, 0);
+	client2->FlushEvents();
+
+	// Wait until the server disconnects the second client
+	{
+		bool completed = false;
+		auto start = std::chrono::system_clock::now();
+		while ((std::chrono::system_clock::now() - start) < std::chrono::milliseconds(1000))
+		{
+			evtc_rpc_client_status status = client2->GetStatus();
+			if (status.Connected == false || status.ConnectTime > beforeConflictingEvent)
+			{
+				completed = true;
+				break;
+			}
+
+			Sleep(1);
+		}
+		EXPECT_TRUE(completed);
+	}
+
+	// Verify that the first client is still there and was not disconnected
+	{
+		evtc_rpc_client_status status = client1->GetStatus();
+		EXPECT_TRUE(status.Connected);
+		EXPECT_LE(status.ConnectTime, beforeConflictingEvent);
+	}
+	{
+		std::lock_guard lock(Server->mRegisteredAgentsLock);
+
+		EXPECT_EQ(Server->mRegisteredAgents.size(), 1U);
+		auto iter = Server->mRegisteredAgents.find("testagent.1234");
+		ASSERT_NE(iter, Server->mRegisteredAgents.end());
+		EXPECT_EQ(iter->first, "testagent.1234");
+		EXPECT_EQ(iter->second->Iterator, iter);
+		EXPECT_EQ(iter->second->InstanceId, 13);
+		EXPECT_EQ(iter->second->Peers.size(), 0);
+	}
+}
+
+
+TEST_F(SimpleNetworkTestFixture, RegisterSelfDuplicateTimeout)
+{
+	ClientInstance& client1 = NewClient();
+	ClientInstance& client2 = NewClient();
+
+	// Send a self agent registration event
+	ag ag1{};
+	ag ag2{};
+	ag1.elite = 0;
+	ag1.prof = static_cast<Prof>(1);
+	ag2.self = 1;
+	ag2.id = 13;
+	ag2.name = "testagent.1234";
+
+	client1->ProcessLocalEvent(nullptr, &ag1, &ag2, nullptr, 0, 0);
+	client1->FlushEvents();
+
+	// Wait until the server sees the new agent
+	{
+		bool completed = false;
+		auto start = std::chrono::system_clock::now();
+		while ((std::chrono::system_clock::now() - start) < std::chrono::milliseconds(1000))
+		{
+			{
+				std::lock_guard lock(Server->mRegisteredAgentsLock);
+				if (Server->mRegisteredAgents.size() >= 1)
+				{
+					auto iter = Server->mRegisteredAgents.find("testagent.1234");
+					if (iter != Server->mRegisteredAgents.end() && iter->second->InstanceId == 13)
+					{
+						completed = true;
+						break;
+					}
+				}
+			}
+
+			Sleep(1);
+		}
+		EXPECT_TRUE(completed);
+	}
+
+	// Reduce the duplicate client timeout to 0, making it always exceeded
+	Server->mConflictingClientDisconnectThresholdMs = 0;
+
+	std::chrono::steady_clock::time_point beforeConflictingEvent = std::chrono::steady_clock::now();
+
+	// Send a conflicting registration
+	client2->ProcessLocalEvent(nullptr, &ag1, &ag2, nullptr, 0, 0);
+	client2->FlushEvents();
+
+	// Wait until the server disconnects the first client
+	{
+		bool completed = false;
+		auto start = std::chrono::system_clock::now();
+		while ((std::chrono::system_clock::now() - start) < std::chrono::milliseconds(1000))
+		{
+			evtc_rpc_client_status status = client1->GetStatus();
+			if (status.Connected == false || status.ConnectTime > beforeConflictingEvent)
+			{
+				completed = true;
+				break;
+			}
+
+			Sleep(1);
+		}
+		EXPECT_TRUE(completed);
+	}
+
+	// Verify that the second client is still there and was not disconnected
+	{
+		evtc_rpc_client_status status = client2->GetStatus();
+		EXPECT_TRUE(status.Connected);
+		EXPECT_LE(status.ConnectTime, beforeConflictingEvent);
+	}
+	{
+		std::lock_guard lock(Server->mRegisteredAgentsLock);
+
+		EXPECT_EQ(Server->mRegisteredAgents.size(), 1U);
+		auto iter = Server->mRegisteredAgents.find("testagent.1234");
+		ASSERT_NE(iter, Server->mRegisteredAgents.end());
+		EXPECT_EQ(iter->first, "testagent.1234");
+		EXPECT_EQ(iter->second->Iterator, iter);
+		EXPECT_EQ(iter->second->InstanceId, 13);
+		EXPECT_EQ(iter->second->Peers.size(), 0);
 	}
 }
 
@@ -590,6 +759,8 @@ TEST_F(SimpleNetworkTestFixture, RegisterPeer)
 
 	// Deregister the non-self agent
 	ag1.prof = static_cast<Prof>(0);
+	ag2 = ag{};
+	ag2.name = "";
 	client1->ProcessAreaEvent(nullptr, &ag1, &ag2, nullptr, 0, 0);
 
 	FlushEvents();
@@ -864,10 +1035,10 @@ TEST_P(NetworkXevtcTestFixture, druid_MO)
 		EXPECT_EQ(totalEntry.Hits, 727);
 
 		AggregatedVector expectedTotals;
-		expectedTotals.Add(0, "Group", combatTime, 207634, 449, std::nullopt);
-		expectedTotals.Add(0, "Squad", combatTime, 304967, 727, std::nullopt);
-		expectedTotals.Add(0, "All (Excluding Summons)", combatTime, 304967, 727, std::nullopt);
-		expectedTotals.Add(0, "All (Including Summons)", combatTime, 409220, 1186, std::nullopt);
+		expectedTotals.Add(0, "Group", combatTime, 207634, 449, std::nullopt, 0);
+		expectedTotals.Add(0, "Squad", combatTime, 304967, 727, std::nullopt, 0);
+		expectedTotals.Add(0, "All (Excluding Summons)", combatTime, 304967, 727, std::nullopt, 0);
+		expectedTotals.Add(0, "All (Including Summons)", combatTime, 409220, 1186, std::nullopt, 0);
 
 		const AggregatedVector& totals = stats.GetStats(DataSource::Totals);
 		ASSERT_EQ(totals.Entries.size(), expectedTotals.Entries.size());
@@ -878,16 +1049,16 @@ TEST_P(NetworkXevtcTestFixture, druid_MO)
 		}
 
 		AggregatedVector expectedAgents;
-		expectedAgents.Add(2000, "Zarwae", combatTime, 51011, 135, std::nullopt);
-		expectedAgents.Add(3148, "Apocalypse Dawn", combatTime, 47929, 89, std::nullopt);
-		expectedAgents.Add(3150, "Waiana Sulis", combatTime, 40005, 86, std::nullopt);
-		expectedAgents.Add(3149, "And Avr Two L Q E A", combatTime, 39603, 71, std::nullopt);
-		expectedAgents.Add(3144, "Taya Celeste", combatTime, 29086, 68, std::nullopt);
-		expectedAgents.Add(3145, "Teivarus", combatTime, 26490, 71, std::nullopt);
-		expectedAgents.Add(3151, "Janna Larion", combatTime, 21902, 71, std::nullopt);
-		expectedAgents.Add(3137, "Lady Manyak", combatTime, 20637, 52, std::nullopt);
-		expectedAgents.Add(3146, "Akashi Vi Britannia", combatTime, 20084, 55, std::nullopt);
-		expectedAgents.Add(3147, u8"Moa Fhómhair", combatTime, 8220, 29, std::nullopt);
+		expectedAgents.Add(2000, "Zarwae", combatTime, 51011, 135, std::nullopt, 0);
+		expectedAgents.Add(3148, "Apocalypse Dawn", combatTime, 47929, 89, std::nullopt, 0);
+		expectedAgents.Add(3150, "Waiana Sulis", combatTime, 40005, 86, std::nullopt, 0);
+		expectedAgents.Add(3149, "And Avr Two L Q E A", combatTime, 39603, 71, std::nullopt, 0);
+		expectedAgents.Add(3144, "Taya Celeste", combatTime, 29086, 68, std::nullopt, 0);
+		expectedAgents.Add(3145, "Teivarus", combatTime, 26490, 71, std::nullopt, 0);
+		expectedAgents.Add(3151, "Janna Larion", combatTime, 21902, 71, std::nullopt, 0);
+		expectedAgents.Add(3137, "Lady Manyak", combatTime, 20637, 52, std::nullopt, 0);
+		expectedAgents.Add(3146, "Akashi Vi Britannia", combatTime, 20084, 55, std::nullopt, 0);
+		expectedAgents.Add(3147, "Moa Fhómhair", combatTime, 8220, 29, std::nullopt, 0);
 
 		const AggregatedVector& agents = stats.GetStats(DataSource::Agents);
 		ASSERT_EQ(agents.Entries.size(), expectedAgents.Entries.size());
@@ -908,8 +1079,8 @@ TEST_P(NetworkXevtcTestFixture, druid_MO)
 
 	float combatTime = stats.GetCombatTime();
 	AggregatedVector expectedStats;
-	expectedStats.Add(2000, "Zarwae", combatTime, 304967, 727, std::nullopt);
-	expectedStats.Add(100000, "Local Fake Self", combatTime, 304967, 727, std::nullopt);
+	expectedStats.Add(2000, HealedAgent{697, "Zarwae", ":worshipperofnarnia.2689", 2, false, true, Prof::PROF_RANGER, 5}, combatTime, 304967, 727, std::nullopt, 0);
+	expectedStats.Add(100000, HealedAgent{65533, "Local Fake Self", nullptr, 1, false, true, Prof::PROF_UNKNOWN, 0xFFFFFFFF}, combatTime, 304967, 727, std::nullopt, 0);
 
 	const AggregatedVector& actualStats = stats.GetStats(DataSource::PeersOutgoing);
 	ASSERT_EQ(actualStats.Entries.size(), expectedStats.Entries.size());
@@ -946,10 +1117,10 @@ TEST_P(NetworkXevtcTestFixture, berserker_solo)
 		EXPECT_EQ(totalEntry.Hits, totalHits);
 
 		AggregatedVector expectedTotals;
-		expectedTotals.Add(0, "Group", combatTime, totalHealing, totalHits, std::nullopt);
-		expectedTotals.Add(0, "Squad", combatTime, totalHealing, totalHits, std::nullopt);
-		expectedTotals.Add(0, "All (Excluding Summons)", combatTime, totalHealing, totalHits, std::nullopt);
-		expectedTotals.Add(0, "All (Including Summons)", combatTime, totalHealing, totalHits, std::nullopt);
+		expectedTotals.Add(0, "Group", combatTime, totalHealing, totalHits, std::nullopt, 0);
+		expectedTotals.Add(0, "Squad", combatTime, totalHealing, totalHits, std::nullopt, 0);
+		expectedTotals.Add(0, "All (Excluding Summons)", combatTime, totalHealing, totalHits, std::nullopt, 0);
+		expectedTotals.Add(0, "All (Including Summons)", combatTime, totalHealing, totalHits, std::nullopt, 0);
 
 		const AggregatedVector& totals = stats.GetStats(DataSource::Totals);
 		ASSERT_EQ(totals.Entries.size(), expectedTotals.Entries.size());
@@ -960,7 +1131,7 @@ TEST_P(NetworkXevtcTestFixture, berserker_solo)
 		}
 
 		AggregatedVector expectedAgents;
-		expectedAgents.Add(2000, "Khalagur", combatTime, totalHealing, totalHits, std::nullopt);
+		expectedAgents.Add(2000, "Khalagur", combatTime, totalHealing, totalHits, std::nullopt, 0);
 
 		const AggregatedVector& agents = stats.GetStats(DataSource::Agents);
 		ASSERT_EQ(agents.Entries.size(), expectedAgents.Entries.size());
@@ -971,8 +1142,8 @@ TEST_P(NetworkXevtcTestFixture, berserker_solo)
 		}
 
 		AggregatedVector expectedSkills;
-		expectedSkills.Add(0, "Healing by Damage Dealt", combatTime, 163393, 79, std::nullopt);
-		expectedSkills.Add(30189, "Blood Reckoning", combatTime, 32300, 10, std::nullopt);
+		expectedSkills.Add(0, "From Damage Dealt", combatTime, 163393, 79, std::nullopt, 0);
+		expectedSkills.Add(30189, "Blood Reckoning", combatTime, 32300, 10, std::nullopt, 0);
 
 		const AggregatedVector& skills = stats.GetStats(DataSource::Skills);
 		ASSERT_EQ(skills.Entries.size(), expectedSkills.Entries.size());
@@ -993,8 +1164,8 @@ TEST_P(NetworkXevtcTestFixture, berserker_solo)
 
 	float combatTime = stats.GetCombatTime();
 	AggregatedVector expectedStats;
-	expectedStats.Add(2000, "Khalagur", combatTime, totalHealing, totalHits, std::nullopt);
-	expectedStats.Add(100000, "Local Fake Self", combatTime, totalHealing, totalHits, std::nullopt);
+	expectedStats.Add(2000, HealedAgent{23, "Khalagur", ":worshipperofnarnia.2689", 1, false, true, Prof::PROF_WARRIOR, 18}, combatTime, totalHealing, totalHits, std::nullopt, 0);
+	expectedStats.Add(100000, HealedAgent{65533, "Local Fake Self", nullptr, 1, false, true, Prof::PROF_UNKNOWN, 0xFFFFFFFF}, combatTime, totalHealing, totalHits, std::nullopt, 0);
 
 	const AggregatedVector& actualStats = stats.GetStats(DataSource::PeersOutgoing);
 	ASSERT_EQ(actualStats.Entries.size(), expectedStats.Entries.size());
@@ -1031,10 +1202,10 @@ TEST_P(NetworkXevtcTestFixture, renegade_solo)
 		EXPECT_EQ(totalEntry.Hits, totalHits);
 
 		AggregatedVector expectedTotals;
-		expectedTotals.Add(0, "Group", combatTime, totalHealing, totalHits, std::nullopt);
-		expectedTotals.Add(0, "Squad", combatTime, totalHealing, totalHits, std::nullopt);
-		expectedTotals.Add(0, "All (Excluding Summons)", combatTime, totalHealing, totalHits, std::nullopt);
-		expectedTotals.Add(0, "All (Including Summons)", combatTime, totalHealing, totalHits, std::nullopt);
+		expectedTotals.Add(0, "Group", combatTime, totalHealing, totalHits, std::nullopt, 0);
+		expectedTotals.Add(0, "Squad", combatTime, totalHealing, totalHits, std::nullopt, 0);
+		expectedTotals.Add(0, "All (Excluding Summons)", combatTime, totalHealing, totalHits, std::nullopt, 0);
+		expectedTotals.Add(0, "All (Including Summons)", combatTime, totalHealing, totalHits, std::nullopt, 0);
 
 		const AggregatedVector& totals = stats.GetStats(DataSource::Totals);
 		ASSERT_EQ(totals.Entries.size(), expectedTotals.Entries.size());
@@ -1045,7 +1216,7 @@ TEST_P(NetworkXevtcTestFixture, renegade_solo)
 		}
 
 		AggregatedVector expectedAgents;
-		expectedAgents.Add(2000, "Enagyy", combatTime, totalHealing, totalHits, std::nullopt);
+		expectedAgents.Add(2000, "Enagyy", combatTime, totalHealing, totalHits, std::nullopt, 0);
 
 		const AggregatedVector& agents = stats.GetStats(DataSource::Agents);
 		ASSERT_EQ(agents.Entries.size(), expectedAgents.Entries.size());
@@ -1056,12 +1227,12 @@ TEST_P(NetworkXevtcTestFixture, renegade_solo)
 		}
 
 		AggregatedVector expectedSkills;
-		expectedSkills.Add(26646, "Battle Scars", combatTime, 33792, 295, std::nullopt);
-		expectedSkills.Add(57409, "Nourishment", combatTime, 7181, 24, std::nullopt);
-		expectedSkills.Add(45686, "Breakrazor's Bastion (Self)", combatTime, 3923, 1, std::nullopt);
-		expectedSkills.Add(28313, "Enchanted Daggers (Siphon)", combatTime, 3870, 6, std::nullopt);
-		expectedSkills.Add(46232, "Breakrazor's Bastion (Area)", combatTime, 3218, 10, std::nullopt);
-		expectedSkills.Add(26937, "Enchanted Daggers (Initial)", combatTime, 1560, 1, std::nullopt);
+		expectedSkills.Add(26646, "Battle Scars", combatTime, 33792, 295, std::nullopt, 0);
+		expectedSkills.Add(57409, "Nourishment", combatTime, 7181, 24, std::nullopt, 0);
+		expectedSkills.Add(45686, "Breakrazor's Bastion (Self)", combatTime, 3923, 1, std::nullopt, 0);
+		expectedSkills.Add(28313, "Enchanted Daggers (Siphon)", combatTime, 3870, 6, std::nullopt, 0);
+		expectedSkills.Add(46232, "Breakrazor's Bastion (Area)", combatTime, 3218, 10, std::nullopt, 0);
+		expectedSkills.Add(26937, "Enchanted Daggers (Initial)", combatTime, 1560, 1, std::nullopt, 0);
 
 		const AggregatedVector& skills = stats.GetStats(DataSource::Skills);
 		ASSERT_EQ(skills.Entries.size(), expectedSkills.Entries.size());
@@ -1082,8 +1253,8 @@ TEST_P(NetworkXevtcTestFixture, renegade_solo)
 
 	float combatTime = stats.GetCombatTime();
 	AggregatedVector expectedStats;
-	expectedStats.Add(2000, "Enagyy", combatTime, totalHealing, totalHits, std::nullopt);
-	expectedStats.Add(100000, "Local Fake Self", combatTime, totalHealing, totalHits, std::nullopt);
+	expectedStats.Add(2000, HealedAgent{23, "Enagyy", ":worshipperofnarnia.2689", 1, false, true, Prof::PROF_RENEGADE, 63}, combatTime, totalHealing, totalHits, std::nullopt, 0);
+	expectedStats.Add(100000, HealedAgent{65533, "Local Fake Self", nullptr, 1, false, true, Prof::PROF_UNKNOWN, 0xFFFFFFFF}, combatTime, totalHealing, totalHits, std::nullopt, 0);
 
 	const AggregatedVector& actualStats = stats.GetStats(DataSource::PeersOutgoing);
 	ASSERT_EQ(actualStats.Entries.size(), expectedStats.Entries.size());
