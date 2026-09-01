@@ -106,6 +106,7 @@ const AggregatedVector& AggregatedStats::GetGroupFilterTotals()
 	HealWindowOptions fakeOptions;
 
 	uint64_t combatEnd = GetCombatEnd();
+	auto includedSkills = GetIncludedSkills();
 
 	for (const HealEvent& curEvent : mySourceData.Events)
 	{
@@ -114,11 +115,37 @@ const AggregatedVector& AggregatedStats::GetGroupFilterTotals()
 			continue;
 		}
 
-		if (curEvent.IsBarrierGeneration && myOptions.ExcludeBarrierGeneration == true)
+		if (curEvent.IsAgainstDowned)
 		{
-			continue;
+			if (myOptions.ExcludeAgainstDowned == true)
+			{
+				continue;
+			}
 		}
-		else if (!curEvent.IsBarrierGeneration && myOptions.ExcludeHealing == true)
+		else // Non-downed
+		{
+			if (myOptions.ExcludeAgainstNonDowned == true)
+			{
+				continue;
+			}
+		}
+			
+		if (curEvent.IsBarrierGeneration)
+		{
+			if (myOptions.ExcludeBarrierGeneration == true)
+			{
+				continue;
+			}
+		}
+		else // Healing
+		{
+			if (myOptions.ExcludeHealing == true)
+			{
+				continue;
+			}
+		}
+
+		if (FilterSkill(curEvent.SkillId, includedSkills))
 		{
 			continue;
 		}
@@ -305,6 +332,7 @@ const AggregatedVector& AggregatedStats::GetAgents(std::optional<uint32_t> pSkil
 	std::map<uintptr_t, TempAgent> tempMap;
 
 	uint64_t combatEnd = GetCombatEnd();
+	auto includedSkills = GetIncludedSkills();
 
 	for (const HealEvent& curEvent : mySourceData.Events)
 	{
@@ -313,13 +341,34 @@ const AggregatedVector& AggregatedStats::GetAgents(std::optional<uint32_t> pSkil
 			continue;
 		}
 
-		if (curEvent.IsBarrierGeneration && myOptions.ExcludeBarrierGeneration == true)
+		if (curEvent.IsAgainstDowned)
 		{
-			continue;
+			if (myOptions.ExcludeAgainstDowned == true)
+			{
+				continue;
+			}
 		}
-		else if (!curEvent.IsBarrierGeneration && myOptions.ExcludeHealing == true)
+		else // Non-downed
 		{
-			continue;
+			if (myOptions.ExcludeAgainstNonDowned == true)
+			{
+				continue;
+			}
+		}
+		
+		if (curEvent.IsBarrierGeneration)
+		{
+			if (myOptions.ExcludeBarrierGeneration == true)
+			{
+				continue;
+			}
+		}
+		else // Healing
+		{
+			if (myOptions.ExcludeHealing == true)
+			{
+				continue;
+			}
 		}
 
 		if (pSkillId.has_value() == true)
@@ -328,6 +377,11 @@ const AggregatedVector& AggregatedStats::GetAgents(std::optional<uint32_t> pSkil
 			{
 				continue;
 			}
+		}
+
+		if (FilterSkill(curEvent.SkillId, includedSkills))
+		{
+			continue;
 		}
 
 		auto mapAgent = std::as_const(mySourceData.Agents).find(curEvent.AgentId);
@@ -346,7 +400,7 @@ const AggregatedVector& AggregatedStats::GetAgents(std::optional<uint32_t> pSkil
 		{
 			// For barrier generation hits, track the total barrier generation separately as a sub-total of healing.
 			agent->second.BarrierGeneration += curEvent.Size;
-		}			
+		}
 	}
 
 	// Caching the result in a display friendly way
@@ -432,6 +486,7 @@ const AggregatedVector& AggregatedStats::GetSkills(std::optional<uintptr_t> pAge
 	std::map<uint32_t, TempSkill> tempMap;
 
 	uint64_t combatEnd = GetCombatEnd();
+	auto includedSkills = GetIncludedSkills();
 	uint64_t totalIndirectHealing = 0;
 	uint64_t totalIndirectTicks = 0;
 	uint64_t totalIndirectBarrierGeneration = 0;
@@ -443,11 +498,37 @@ const AggregatedVector& AggregatedStats::GetSkills(std::optional<uintptr_t> pAge
 			continue;
 		}
 
-		if (curEvent.IsBarrierGeneration && myOptions.ExcludeBarrierGeneration == true)
+		if (curEvent.IsAgainstDowned)
 		{
-			continue;
+			if (myOptions.ExcludeAgainstDowned == true)
+			{
+				continue;
+			}
 		}
-		else if (!curEvent.IsBarrierGeneration && myOptions.ExcludeHealing == true)
+		else // Non-downed
+		{
+			if (myOptions.ExcludeAgainstNonDowned == true)
+			{
+				continue;
+			}
+		}
+		
+		if (curEvent.IsBarrierGeneration)
+		{
+			if (myOptions.ExcludeBarrierGeneration == true)
+			{
+				continue;
+			}
+		}
+		else // Healing
+		{
+			if (myOptions.ExcludeHealing == true)
+			{
+				continue;
+			}
+		}
+
+		if (FilterSkill(curEvent.SkillId, includedSkills))
 		{
 			continue;
 		}
@@ -651,4 +732,19 @@ bool AggregatedStats::FilterInternal(std::map<uintptr_t, HealedAgent>::const_ite
 	}
 
 	return false;
+}
+
+bool AggregatedStats::FilterSkill(uint32_t pSkillId, std::vector<uint32_t>& pIncludedSkills) const
+{
+	if (pIncludedSkills.empty())
+	{
+		return false;
+	}
+
+	return !std::ranges::contains(pIncludedSkills, pSkillId);
+}
+
+std::vector<uint32_t> AggregatedStats::GetIncludedSkills() const
+{
+	return ParseUInt32String(std::string_view(myOptions.IncludedSkills));
 }

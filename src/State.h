@@ -10,6 +10,7 @@
 constexpr static uint32_t MAX_HEAL_WINDOW_NAME = 31;
 constexpr static uint32_t MAX_HEAL_WINDOW_TITLE = 127;
 constexpr static uint32_t MAX_HEAL_WINDOW_ENTRY = 127;
+constexpr static uint32_t MAX_HEAL_WINDOW_INCLUDED_SKILLS = 127;
 constexpr static uint32_t HEAL_WINDOW_COUNT = 10;
 
 enum class DataSource
@@ -59,6 +60,8 @@ struct HealWindowOptions
 	bool ExcludeUnmapped = true;
 	bool ExcludeHealing = false;
 	bool ExcludeBarrierGeneration = true;
+	bool ExcludeAgainstDowned = false;
+	bool ExcludeAgainstNonDowned = false;
 
 	bool ShowProgressBars = true;
 	bool UseSubgroupForBarColour = false;
@@ -74,9 +77,10 @@ struct HealWindowOptions
 	bool SelfOnly = false;
 	bool AnonymousMode = false;
 	char Name[MAX_HEAL_WINDOW_NAME + 1] = {};
-	char TitleFormat[MAX_HEAL_WINDOW_TITLE + 1] = "{1} ({4} / 秒, 進入戰鬥{7}秒)";
-	char EntryFormat[MAX_HEAL_WINDOW_ENTRY + 1] = "{1} ({4}/秒, {7}%)";
-	char DetailsEntryFormat[MAX_HEAL_WINDOW_ENTRY + 1] = "{1} ({4}/秒, {7}%)";
+	char TitleFormat[MAX_HEAL_WINDOW_TITLE + 1] = "{1} ({4}/秒，進入戰鬥{7}秒)";
+	char EntryFormat[MAX_HEAL_WINDOW_ENTRY + 1] = "{1} ({4}/秒，{7}%)";
+	char DetailsEntryFormat[MAX_HEAL_WINDOW_ENTRY + 1] = "{1} ({4}/秒，{7}%)";
+	char IncludedSkills[MAX_HEAL_WINDOW_INCLUDED_SKILLS + 1] = {};
 
 	ImGuiWindowFlags_ WindowFlags = ImGuiWindowFlags_None;
 
