@@ -724,10 +724,10 @@ static void Display_WindowOptions(HealTableOptions& pHealingOptions, HealWindowC
 
 			ImGuiEx::SmallCheckBox("治療", &pContext.ExcludeHealing);
 			ImGuiEx::SmallCheckBox("屏障產生", &pContext.ExcludeBarrierGeneration);
-			ImGuiEx::SmallCheckBox("against downed", &pContext.ExcludeAgainstDowned);
-			ImGuiEx::SmallCheckBox("against non-downed", &pContext.ExcludeAgainstNonDowned);
-			ImGuiEx::SmallInputText("all but skill ids", pContext.IncludedSkills, sizeof(pContext.IncludedSkills));
-			ImGuiEx::AddTooltipToLastItem("Only stats for these skill ids should be included in this window. Comma-separated list, e.g. \"1000,1001,2020\"");
+			ImGuiEx::SmallCheckBox("排除倒地目標", &pContext.ExcludeAgainstDowned);
+			ImGuiEx::SmallCheckBox("排除非倒地目標", &pContext.ExcludeAgainstNonDowned);
+			ImGuiEx::SmallInputText("限定技能 ID", pContext.IncludedSkills, sizeof(pContext.IncludedSkills));
+			ImGuiEx::AddTooltipToLastItem("只有這些技能 ID 的數據才會包含在此視窗中。 以逗號分隔的列表，例如: \"1000,1001,2020\"");
 
 			ImGui::EndMenu();
 		}
