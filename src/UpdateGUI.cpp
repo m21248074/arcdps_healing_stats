@@ -1,4 +1,4 @@
-#include "UpdateGUI.h"
+﻿#include "UpdateGUI.h"
 
 #include "Exports.h"
 #include "ImGuiEx.h"
@@ -49,18 +49,18 @@ void Display_UpdateWindow()
 	{
 		bool shown = true;
 		if (ImGui::Begin(
-			"Healing Stats Update###HEALING_STATS_UPDATE",
+			"治療統計 更新###HEALING_STATS_UPDATE",
 			&shown,
 			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize) == true)
 		{
 			const UpdateChecker::Version& currentVersion = *state->CurrentVersion;
 			const UpdateChecker::Version& newVersion = state->NewVersion;
 
-			ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "A new update for the healing stats addon is available");
-			ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "Current version: %u.%urc%u", currentVersion[0], currentVersion[1], currentVersion[2]);
-			ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "New version: %u.%urc%u", newVersion[0], newVersion[1], newVersion[2]);
+			ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "治療統計 插件有新的更新可用");
+			ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "當前版本: %u.%urc%u", currentVersion[0], currentVersion[1], currentVersion[2]);
+			ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "新版本: %u.%urc%u", newVersion[0], newVersion[1], newVersion[2]);
 
-			if (ImGui::Button("Open download page") == true)
+			if (ImGui::Button("開啟下載頁面") == true)
 			{
 				ShellExecuteA(nullptr, nullptr, "https://github.com/Krappa322/arcdps_healing_stats/releases", nullptr, nullptr, SW_SHOW);
 			}
@@ -68,19 +68,19 @@ void Display_UpdateWindow()
 			switch (state->UpdateStatus)
 			{
 			case UpdateChecker::Status::UpdateAvailable:
-				if (ImGui::Button("Update automatically") == true)
+				if (ImGui::Button("自動更新") == true)
 				{
 					GlobalObjects::UPDATE_CHECKER->PerformInstallOrUpdate(*state);
 				}
 				break;
 			case UpdateChecker::Status::UpdateInProgress:
-				ImGui::TextUnformatted("Update in progress");
+				ImGui::TextUnformatted("更新進行中");
 				break;
 			case UpdateChecker::Status::UpdateSuccessful:
-				ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "Update finished, restart Guild Wars 2 for the update to take effect");
+				ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "更新完成，請重啟 激戰2 以使更新生效");
 				break;
 			case UpdateChecker::Status::UpdateError:
-				ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "An error occured while updating");
+				ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "更新時發生錯誤");
 				break;
 			default:
 				break;
