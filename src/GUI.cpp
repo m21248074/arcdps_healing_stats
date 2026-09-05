@@ -927,16 +927,19 @@ void Display_GUI(HealTableOptions& pHealingOptions)
 		{
 			continue;
 		}
-
-		time_t curTime = ::time(0);
-		if (curWindow.LastAggregatedTime < curTime)
+		
+		std::unique_ptr<AggregatedStatsCollection> newAggregatedStats = GlobalObjects::OFFLOADED_STATS_AGGREGATION->TryGetAggregatedStats(i);
+		if (newAggregatedStats != nullptr)
 		{
-			//LOG("Fetching new aggregated stats");
-
-			auto [localId, states] = GlobalObjects::EVENT_PROCESSOR->GetState();
-			curWindow.CurrentAggregatedStats = std::make_unique<AggregatedStatsCollection>(std::move(states), localId, curWindow, pHealingOptions.DebugMode);
-			curWindow.LastAggregatedTime = curTime;
-			curWindow.SelfUniqueId = localId;
+			curWindow.CurrentAggregatedStats = std::move(newAggregatedStats);
+			curWindow.SelfUniqueId = curWindow.CurrentAggregatedStats->GetLocalUniqueId();
+		}
+		if (curWindow.CurrentAggregatedStats == nullptr)
+		{
+			// Window has not yet been aggregated. We could aggregate inline here but then there'd be lag when just
+			// opening a window. It's probably preferable to not show the window over holding the main thread until we
+			// have something to show.
+			continue;
 		}
 
 		float timeInCombat = curWindow.CurrentAggregatedStats->GetCombatTime();
@@ -1123,7 +1126,21 @@ void Display_AddonOptions(HealTableOptions& pHealingOptions)
 	{
 		char buffer[128];
 		snprintf(buffer, sizeof(buffer), "(%u) %s", i, pHealingOptions.Windows[i].Name);
-		ImGuiEx::SmallCheckBox(buffer, &pHealingOptions.Windows[i].Shown);
+		if (ImGuiEx::SmallCheckBox(buffer, &pHealingOptions.Windows[i].Shown) == true)
+		{
+			if (pHealingOptions.Windows[i].Shown == true)
+			{
+				// Try to get stats as soon as we can after toggling a window
+				GlobalObjects::OFFLOADED_STATS_AGGREGATION->WakeThread();
+			}
+			else
+			{
+				// Don't pin the memory when the window is disabled. Also prevents showing stale stats when the window gets
+				// re-enabled later.
+				pHealingOptions.Windows[i].CurrentAggregatedStats = nullptr;
+			}
+			LogD("Changed window {} shown to {}", i, BOOL_STR(pHealingOptions.Windows[i].Shown));
+		}
 	}
 	ImGuiEx::SmallUnindent();
 

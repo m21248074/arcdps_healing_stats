@@ -17,6 +17,8 @@ public:
 	const AggregatedStatsEntry& GetTotal(DataSource pDataSource);
 	const AggregatedVector& GetStats(DataSource pDataSource);
 	const AggregatedVector& GetDetails(DataSource pDataSource, uint64_t pId);
+	
+	uintptr_t GetLocalUniqueId();
 
 	const AggregatedVector& GetGroupFilterTotals();
 

@@ -3,6 +3,7 @@
 #include "GUI.h"
 #include "KeysDown.h"
 #include "Log.h"
+#include "OffloadedStatsAggregation.h"
 #include "PlayerStats.h"
 #include "Utilities.h"
 
@@ -262,6 +263,18 @@ arcdps_exports* mod_init()
 
 		GlobalObjects::EVENT_SEQUENCER = std::make_unique<EventSequencer>(ProcessLocalEvent);
 		GlobalObjects::EVENT_PROCESSOR = std::make_unique<EventProcessor>();
+		auto getHealWindowOptions = [](bool& pDebugMode) -> std::vector<HealWindowOptions> {
+			std::lock_guard lock(HEAL_TABLE_OPTIONS_MUTEX);
+			pDebugMode = HEAL_TABLE_OPTIONS.DebugMode;
+			std::vector<HealWindowOptions> res;
+			for (const HealWindowContext& window : HEAL_TABLE_OPTIONS.Windows)
+			{
+				res.emplace_back(static_cast<const HealWindowOptions&>(window));
+			}
+			return res;
+		};
+		GlobalObjects::OFFLOADED_STATS_AGGREGATION = std::make_unique<OffloadedStatsAggregation>(std::move(getHealWindowOptions));
+
 		GlobalObjects::EVTC_RPC_CLIENT = std::make_unique<evtc_rpc_client>(std::move(getEndpoint), std::move(getCertificates), std::function{ProcessPeerEvent});
 
 		GlobalObjects::EVENT_PROCESSOR->SetEvtcLoggingEnabled(HEAL_TABLE_OPTIONS.EvtcLoggingEnabled);
@@ -281,6 +294,8 @@ arcdps_exports* mod_init()
 
 	GlobalObjects::EVTC_RPC_CLIENT_THREAD = std::make_unique<std::thread>(evtc_rpc_client::ThreadStartServe, GlobalObjects::EVTC_RPC_CLIENT.get());
 
+	GlobalObjects::OFFLOADED_STATS_AGGREGATION_THREAD = std::make_unique<std::thread>(OffloadedStatsAggregation::ThreadStartServe, GlobalObjects::OFFLOADED_STATS_AGGREGATION.get());
+
 	LogI("Startup completed, arcdps_version={} healing_stats_version={} cpr_version={} curl_version={} grpc_version={} grpc_core_version={} c-ares_version={}",
 		ARCDPS_VERSION, ARC_EXPORTS.out_build, CPR_VERSION, LIBCURL_VERSION, grpc::Version(), grpc_version_string(), ARES_VERSION_STR);
 	return &ARC_EXPORTS;
@@ -289,11 +304,13 @@ arcdps_exports* mod_init()
 /* release mod -- return ignored */
 uintptr_t mod_release()
 {
-	LogD("Shutting down, sequencer={}, processor={}, client={} client_thread={}",
+	LogD("Shutting down, sequencer={}, processor={}, client={} client_thread={} offloaded_stats={} offloaded_stats_thread={}",
 		static_cast<void*>(GlobalObjects::EVENT_SEQUENCER.get()),
 		static_cast<void*>(GlobalObjects::EVENT_PROCESSOR.get()),
 		static_cast<void*>(GlobalObjects::EVTC_RPC_CLIENT.get()), 
-		static_cast<void*>(GlobalObjects::EVTC_RPC_CLIENT_THREAD.get()));
+		static_cast<void*>(GlobalObjects::EVTC_RPC_CLIENT_THREAD.get()),
+		static_cast<void*>(GlobalObjects::OFFLOADED_STATS_AGGREGATION.get()),
+		static_cast<void*>(GlobalObjects::OFFLOADED_STATS_AGGREGATION_THREAD.get()));
 
 	{
 		std::unique_lock shutdown_lock(GlobalObjects::SHUTDOWN_LOCK);
@@ -306,6 +323,7 @@ uintptr_t mod_release()
 	}
 
 	GlobalObjects::EVTC_RPC_CLIENT->Shutdown();
+	GlobalObjects::OFFLOADED_STATS_AGGREGATION->Shutdown();
 
 	{
 		std::lock_guard lock(HEAL_TABLE_OPTIONS_MUTEX);
@@ -322,6 +340,11 @@ uintptr_t mod_release()
 	GlobalObjects::EVTC_RPC_CLIENT_THREAD->join();
 	GlobalObjects::EVTC_RPC_CLIENT_THREAD = nullptr;
 	GlobalObjects::EVTC_RPC_CLIENT = nullptr;
+
+	GlobalObjects::OFFLOADED_STATS_AGGREGATION_THREAD->join();
+	GlobalObjects::OFFLOADED_STATS_AGGREGATION_THREAD = nullptr;
+	GlobalObjects::OFFLOADED_STATS_AGGREGATION = nullptr;
+
 	GlobalObjects::EVENT_PROCESSOR = nullptr;
 	GlobalObjects::EVENT_SEQUENCER = nullptr;
 
@@ -470,6 +493,18 @@ UINT mod_wnd(HWND pWindowHandle, UINT pMessage, WPARAM pAdditionalW, LPARAM pAdd
 					assert(KeysDown::IsKeyDown(HEAL_TABLE_OPTIONS.Windows[i].Hotkey) == true);
 
 					HEAL_TABLE_OPTIONS.Windows[i].Shown = !HEAL_TABLE_OPTIONS.Windows[i].Shown;
+					if (HEAL_TABLE_OPTIONS.Windows[i].Shown == true)
+					{
+						// Try to get stats as soon as we can after toggling a window on
+						GlobalObjects::OFFLOADED_STATS_AGGREGATION->WakeThread();
+					}
+					else
+					{
+						// Don't pin the memory when the window is disabled. Also prevents showing stale stats when the window gets
+						// re-enabled later.
+						HEAL_TABLE_OPTIONS.Windows[i].CurrentAggregatedStats = nullptr;
+					}
+
 					triggeredKey = true;
 
 					LOG("Key %i '%s' toggled window %u - new heal window state is %s", HEAL_TABLE_OPTIONS.Windows[i].Hotkey, VirtualKeyToString(HEAL_TABLE_OPTIONS.Windows[i].Hotkey).c_str(), i, BOOL_STR(HEAL_TABLE_OPTIONS.Windows[i].Shown));

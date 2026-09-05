@@ -54,6 +54,9 @@
     <ClCompile Include="src\UpdateGUI.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\OffloadedStatsAggregation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Log.h">
@@ -114,6 +117,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\KeysDown.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\OffloadedStatsAggregation.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2,6 +2,7 @@
 
 #include "EventProcessor.h"
 #include "EventSequencer.h"
+#include "OffloadedStatsAggregation.h"
 #include "UpdateGUI.h"
 #include "../networking/Client.h"
 
@@ -29,8 +30,12 @@ public:
 	static inline E9Signature ARC_E10 = nullptr;
 	static inline std::unique_ptr<EventSequencer> EVENT_SEQUENCER = nullptr;
 	static inline std::unique_ptr<EventProcessor> EVENT_PROCESSOR = nullptr;
+	static inline std::unique_ptr<OffloadedStatsAggregation> OFFLOADED_STATS_AGGREGATION = nullptr;
+
 	static inline std::unique_ptr<evtc_rpc_client> EVTC_RPC_CLIENT = nullptr;
 	static inline std::unique_ptr<std::thread> EVTC_RPC_CLIENT_THREAD = nullptr;
+
+	static inline std::unique_ptr<std::thread> OFFLOADED_STATS_AGGREGATION_THREAD = nullptr;
 
 	static inline UpdateChecker::Version VERSION = {};
 	static inline char VERSION_STRING_FRIENDLY[128] = {};
