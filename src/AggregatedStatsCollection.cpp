@@ -17,7 +17,7 @@ AggregatedStatsCollection::AggregatedStatsCollection(std::map<uintptr_t, std::pa
 	mLocalState = mSourceData.end();
 	for (auto& [id, state] : pPeerStates)
 	{
-		auto [iter, inserted] = mSourceData.try_emplace(id, std::move(state.first), std::move(state.second), pOptions, pDebugMode);
+		auto [iter, inserted] = mSourceData.try_emplace(id, std::move(state.first), std::move(state.second), mOptions, pDebugMode);
 		assert(inserted == true);
 		if (id == pLocalUniqueId)
 		{
@@ -94,6 +94,11 @@ const AggregatedVector& AggregatedStatsCollection::GetDetails(DataSource pDataSo
 	}
 
 	return iter->second.Stats.GetStats(DataSource::Skills);
+}
+
+uintptr_t AggregatedStatsCollection::GetLocalUniqueId()
+{
+	return mLocalState->first;
 }
 
 const AggregatedVector& AggregatedStatsCollection::GetGroupFilterTotals()

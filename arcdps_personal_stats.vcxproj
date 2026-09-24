@@ -160,6 +160,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\OffloadedStatsAggregation.cpp" />
     <ClCompile Include="src\AgentTable.cpp" />
     <ClCompile Include="src\AggregatedStats.cpp" />
     <ClCompile Include="src\AggregatedStatsCollection.cpp" />
@@ -175,6 +176,7 @@
     <ClCompile Include="src\UpdateGUI.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\OffloadedStatsAggregation.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="src\AgentTable.h" />
     <ClInclude Include="src\AggregatedStats.h" />

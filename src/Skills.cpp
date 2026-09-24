@@ -133,6 +133,7 @@ SkillTable::SkillTable()
 
 	// Fixing names
 	mSkillNames.emplace(1066, "Revive"); // Pressing "f" on a downed person
+	mSkillNames.emplace(1196, "Revive (Pet)"); // "Lick Wounds" / "Search and Rescue"
 	mSkillNames.emplace(13594, "Selfless Daring"); // The game maps this name incorrectly to "Selflessness Daring"
 	mSkillNames.emplace(14024, "Natural Healing"); // The game does not map this one at all
 	mSkillNames.emplace(26558, "Energy Expulsion");
